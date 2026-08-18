@@ -31,6 +31,7 @@ import shlex
 import shutil
 import subprocess
 import threading
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Optional
@@ -504,16 +505,32 @@ class PodmanComputer(Computer):
         # 命中缓存秒装 (首个容器下载一次, 其余容器从缓存解压 — 40 角色并行
         # 加载时避免 40 次 npm 网络下载)
         Path(_NPM_CACHE_HOST).mkdir(parents=True, exist_ok=True)
-        r = self._pod("ps", "-a", "--filter", f"name={self.container_name}", "--format", "{{.Names}}")
-        if self.container_name not in (r.stdout or ""):
+        r = self._pod("ps", "-a", "--format", "{{.Names}}")
+        # 精确名字检查: 不能依赖 --filter name=X (子串/正则匹配,
+        # maf-tester_1 会误匹配 maf-tester_12 → 误判存在跳过创建)
+        names = set((r.stdout or "").splitlines())
+        if self.container_name not in names:
             # 加入自定义桥接网络 (电脑间互通), 网络不存在则先创建
             network = _COMPUTER_MANAGER.ensure_network()
-            r = self._pod("run", "-d", "--name", self.container_name,
-                          "--network", network,
-                          "-v", f"{host_dir}:{self.workdir}",
-                          "-v", f"{drive_host}:/mnt/drive",
-                          "-v", f"{_NPM_CACHE_HOST}:/root/.npm",
-                          self.image, "sleep", "infinity")
+            # rootless podman 并行创建容器时 storage 层偶发竞态: 名字检查
+            # 通过后 run 仍可能报 "name already in use by external entity"
+            # (半成品 storage 记录/瞬时锁). 清理残留后重试, 最多 3 次.
+            for attempt in range(1, 4):
+                r = self._pod("run", "-d", "--name", self.container_name,
+                              "--network", network,
+                              "-v", f"{host_dir}:{self.workdir}",
+                              "-v", f"{drive_host}:/mnt/drive",
+                              "-v", f"{_NPM_CACHE_HOST}:/root/.npm",
+                              self.image, "sleep", "infinity")
+                if r.returncode == 0:
+                    break
+                logger.warning(
+                    "电脑[%s] podman run 第 %d 次失败 (%s), 清理残留后重试",
+                    self.role_id, attempt,
+                    (r.stderr or r.stdout or "").strip()[:200])
+                # 清理该名字的半成品容器/残留记录 (不存在时 rm 报错忽略)
+                self._pod("rm", "-f", self.container_name)
+                time.sleep(1.0)
             if r.returncode != 0:
                 raise RuntimeError(
                     f"podman run 创建容器失败 ({r.returncode}): "
