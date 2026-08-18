@@ -70,3 +70,15 @@ def test_system_prompt_mentions_cloud_drive(tmp_path, monkeypatch):
     assert "git pull" in prompt
     assert "commit" in prompt and "push" in prompt
     assert "合并" in prompt
+
+
+def test_release_manager_prompt_mentions_project_dir(tmp_path, monkeypatch):
+    """版本管理角色提示词: 项目保存在 Public/work/, 新项目直接在其中创建 git 仓库."""
+    monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
+    pool = RolePool()
+    r = TEMPLATES["release_manager"]()
+    pool.add_role(r)
+    prompt = r.build_system_prompt()
+    assert "/mnt/drive/Public/work/" in prompt
+    assert "git init" in prompt
+    assert "创建 git 仓库" in prompt or "创建 git 项目" in prompt

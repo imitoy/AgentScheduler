@@ -1,0 +1,50 @@
+[
+  {
+    "id": "4234546a",
+    "title": "调度方谨言初始化 git 仓库 snake-game",
+    "detail": "创建 snake-game 项目仓库，main 分支可用，供开发/测试使用",
+    "status": "in_progress",
+    "created_at": 1787058167.186797,
+    "updated_at": 1787058178.1895607
+  },
+  {
+    "id": "f188845d",
+    "title": "调度顾承宇开发贪吃蛇核心玩法",
+    "detail": "纯前端实现移动/吃食物增长/撞墙撞自己结束/计分/重开/键盘控制",
+    "status": "pending",
+    "created_at": 1787058167.1870759,
+    "updated_at": 1787058167.1870759
+  },
+  {
+    "id": "bd429dc9",
+    "title": "调度罗子涵 UI 样式打磨",
+    "detail": "在开发基础上做界面美化，保持简单",
+    "status": "pending",
+    "created_at": 1787058167.187391,
+    "updated_at": 1787058167.187391
+  },
+  {
+    "id": "c6ed65b4",
+    "title": "调度郭晓东功能测试 + 程雪梅 E2E",
+    "detail": "功能用例 + Playwright 自动化，验证核心玩法",
+    "status": "pending",
+    "created_at": 1787058167.187658,
+    "updated_at": 1787058167.187658
+  },
+  {
+    "id": "9893d446",
+    "title": "调度葛天宇汇总测试报告/质量门禁",
+    "detail": "汇总测试结果，输出质量结论",
+    "status": "pending",
+    "created_at": 1787058167.187925,
+    "updated_at": 1787058167.187925
+  },
+  {
+    "id": "c339c3a0",
+    "title": "发布到 Public + 产品说明文档",
+    "detail": "最终产物放 Public 云盘，附产品说明文档，第2天交付",
+    "status": "pending",
+    "created_at": 1787058167.1881943,
+    "updated_at": 1787058167.1881943
+  }
+]
