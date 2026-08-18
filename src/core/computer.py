@@ -277,10 +277,12 @@ class LocalComputer(Computer):
     """
 
     def __init__(self, role_id: str, base_dir: str = "./data/computers",
-                 auto_mcp: bool = False):
+                 auto_mcp: bool = False, drive_dir: str = "./data/drive"):
         super().__init__(role_id, auto_mcp=auto_mcp)
         self._dir = Path(base_dir).resolve() / (role_id or "shared")
         self._dir.mkdir(parents=True, exist_ok=True)
+        # 本地降级云盘目录 (测试可传 tmp 路径隔离; 默认与容器挂载同一份)
+        self._drive_root = str(Path(drive_dir).resolve())
         self._on = True  # 本地模拟默认开机
 
     @property
@@ -295,7 +297,7 @@ class LocalComputer(Computer):
     @property
     def drive_root(self) -> str:
         # Local 降级: 云盘即本地共享目录 (权限语义退化为宿主机单用户)
-        return str((Path("./data/drive")).resolve())
+        return self._drive_root
 
     def power_on(self) -> str:
         self._on = True

@@ -253,11 +253,14 @@ def test_talk_attachment_validated_and_carried(tmp_path, monkeypatch):
     """talk attachment: 无效附件拒绝; 有效附件随消息携带并提示对方."""
     monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
     pool = RolePool()
-    a = AgentRole(name="郭晓东", role_id="tester_1", computer_kind="local")
-    b = AgentRole(name="王建国", role_id="architect", computer_kind="local")
+    # Local 降级电脑: drive 目录用 tmp 隔离 (不碰全局 data/drive)
+    a = AgentRole(name="郭晓东", role_id="tester_1", computer_kind="local",
+                  computer_kwargs={"drive_dir": str(tmp_path / "drive")})
+    b = AgentRole(name="王建国", role_id="architect", computer_kind="local",
+                  computer_kwargs={"drive_dir": str(tmp_path / "drive")})
     pool.add_role(a)
     pool.add_role(b)
-    # 郭晓东在云盘放附件 (Local 降级: drive_root = 本地 data/drive)
+    # 郭晓东在云盘放附件
     a.computer.write_file(f"{a.computer.drive_root}/郭晓东/设计稿.md", "附件内容")
 
     tk_a = create_talk_toolkit(pool)
