@@ -277,8 +277,12 @@ class LocalComputer(Computer):
     """
 
     def __init__(self, role_id: str, base_dir: str = "./data/computers",
-                 auto_mcp: bool = False, drive_dir: str = "./data/drive"):
+                 auto_mcp: bool = False, drive_dir: str = "./data/drive",
+                 name: str = "", username: str = "", uid: int = 0):
         super().__init__(role_id, auto_mcp=auto_mcp)
+        self.name = name          # 角色中文名 (Manager.create 透传)
+        self.username = username or "agent"  # 容器用户名 (本地模拟仅记录)
+        self.uid = int(uid) or 1100
         self._dir = Path(base_dir).resolve() / (role_id or "shared")
         self._dir.mkdir(parents=True, exist_ok=True)
         # 本地降级云盘目录 (测试可传 tmp 路径隔离; 默认与容器挂载同一份)
@@ -710,8 +714,10 @@ class SSHComputer(Computer):
         key_path: Optional[str] = None,
         port: int = 22,
         auto_mcp: bool = False,
+        name: str = "",
     ):
         super().__init__(role_id, auto_mcp=auto_mcp)
+        self.name = name  # 角色中文名 (Manager.create 透传)
         if not host:
             raise ValueError("SSHComputer 需要 host 参数 (远程主机地址)")
         self.host = host
@@ -819,7 +825,9 @@ def create_computer(kind: str = "podman", role_id: str = "", *,
     """
     kind = (kind or "podman").lower()
     if kind == "local":
-        return LocalComputer(role_id=role_id, auto_mcp=auto_mcp)
+        # 透传 kwargs (drive_dir 等) — 之前丢参导致测试/降级环境
+        # 云盘目录不可配置, 只能写全局 data/drive
+        return LocalComputer(role_id=role_id, auto_mcp=auto_mcp, **kwargs)
     if kind == "ssh":
         if not kwargs.get("host"):
             raise ValueError("SSHComputer 需要 host 参数 (远程主机地址)")
