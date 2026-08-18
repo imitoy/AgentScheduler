@@ -245,3 +245,38 @@ def test_third_party_message_not_delivered_as_reply(tmp_path, monkeypatch):
         assert role_a.queue_depth == 1                 # 消息入队, 恢复后处理
     finally:
         role_a._end_wait()
+
+
+# ── 6) 附件 (公司云盘 /mnt/drive 文件) ───────────────────
+
+def test_talk_attachment_validated_and_carried(tmp_path, monkeypatch):
+    """talk attachment: 无效附件拒绝; 有效附件随消息携带并提示对方."""
+    monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
+    pool = RolePool()
+    a = AgentRole(name="郭晓东", role_id="tester_1", computer_kind="local")
+    b = AgentRole(name="王建国", role_id="architect", computer_kind="local")
+    pool.add_role(a)
+    pool.add_role(b)
+    # 郭晓东在云盘放附件 (Local 降级: drive_root = 本地 data/drive)
+    a.computer.write_file(f"{a.computer.drive_root}/郭晓东/设计稿.md", "附件内容")
+
+    tk_a = create_talk_toolkit(pool)
+    tk_a._role_holder = {"role": a}  # type: ignore[attr-defined]
+    tk_b = create_talk_toolkit(pool)
+    tk_b._role_holder = {"role": b}  # type: ignore[attr-defined]
+
+    # 无效附件 (不存在) → 拒绝
+    r = tk_a._tools["talk"].handler(
+        {"target": "王建国", "message": "看下", "attachment": "郭晓东/不存在.md"})
+    assert "附件无效" in r
+    assert b.queue_depth == 0
+    # 有效附件 → 送达, 任务描述带附件提示
+    r2 = tk_a._tools["talk"].handler(
+        {"target": "王建国", "message": "看下设计稿", "attachment": "郭晓东/设计稿.md"})
+    assert "消息已发送给 王建国" in r2
+    task = b.pop_task()
+    assert task is not None
+    assert "[附件: 郭晓东/设计稿.md]" in task.description
+    assert "mnt/drive" in task.description
+    assert task.context.get("attachment") == "郭晓东/设计稿.md"
+    pool.shutdown(wait=False)

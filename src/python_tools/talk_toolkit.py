@@ -175,8 +175,8 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
         attach_hint = ""
         if attachment:
             attach_hint = (
-                f"\n[附件: {attachment}] (企业云盘文件, "
-                f"可用 drive_read 工具读取内容)"
+                f"\n[附件: {attachment}] (公司云盘文件, "
+                f"在 /mnt/drive 下可直接读取)"
             )
         task = Task(
             urgency=urgency,
@@ -240,8 +240,8 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
             "团队当前有哪些成员请先调用 list_roles 获取 (名单是动态的, 可能有新入职). "
             "根据每个人的职责选择合适的人选后, 用 target 发送.\n"
             "target 参数使用成员姓名 (见 list_roles 花名册, 例如 '王建国').\n"
-            "attachment 可选: 企业云盘文件路径 (如 'Public/方案.md' 或 '郭晓东/设计稿.md'), "
-            "作为附件随消息发送, 对方可用 drive_read 读取; 发送前系统会校验文件存在.\n"
+            "attachment 可选: 公司云盘文件路径 (如 'Public/方案.md' 或 '郭晓东/设计稿.md'), "
+            "作为附件随消息发送 (文件在 /mnt/drive 下); 发送前系统会校验文件存在.\n"
             "wait=true 表示需要对方回复后才能继续 (同步等待): 你会进入 WAIT 状态, "
             "消息会附带'你正在等待回复'的提示, 对方收到后应尽快用 talk 回复你; "
             "收到回复后工具返回回复内容并恢复原状态. "

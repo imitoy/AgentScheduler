@@ -220,7 +220,7 @@ NoteStore(base_dir="./data/notes", role_id="", computer=None, time_manager=None)
 **存储与时间**: `note_store` 属性（惰性 NoteStore）、`get_latest_summary(before_day=None)`、`time_manager` 属性、`bind_time_manager(tm)`。
 **活动日志**: `journal(entry)` — 追加一行到 `data/journals/<role_id>.md`（角色上下文更新自动写入：收到任务/执行/工具调用/笔记/消息）。
 **工具**: `add_mcp_tool(name, description, input_schema, handler)`、`add_toolkit(toolkit) -> int`、`mcp_tool_names`。
-**交流**: `talk_to(target, message, urgency="NORMAL") -> str`（编程式跨角色消息）; LLM 经 talk 工具（target/message/urgency/wait）通信, **target 用成员人名**（花名册不暴露 role_id, 内部自动映射）; `wait=true` 时发送方进入 WAIT 状态同步等待对方回复（消息附带"提问者正在等待"提示, 等待无时间限制, 互等死锁自动检测拒绝）。
+**交流**: `talk_to(target, message, urgency="NORMAL") -> str`（编程式跨角色消息）; LLM 经 talk 工具（target/message/urgency/wait/attachment）通信, **target 用成员人名**（花名册不暴露 role_id, 内部自动映射）; `wait=true` 时发送方进入 WAIT 状态同步等待对方回复（消息附带"提问者正在等待"提示, 等待无时间限制, 互等死锁自动检测拒绝）; `attachment` 为公司云盘文件路径（/mnt/drive 下, 发送前校验存在且可读, 对方可直接读取）。
 
 ### `RolePool`
 多角色并发管理，**每角色独立线程 + 独立锁 + 独立 LLM 客户端**（默认 DeepSeekLLM，`llm_provider="ollama"` 时用本地 OllamaLLM）。
@@ -389,7 +389,6 @@ tk.tool_names / tk.tool_count / tk.get_tool(name) / __iter__ / __contains__
 | `memory_toolkit` | `summary(content, day)` / `write_note(title, content, remind_tick, remind_day)` / `edit_note` / `list_notes` / `read_note` | 每日总结（保存后切 OFF_DUTY）+ 笔记（**带 remind_tick = 定时提醒**，已合并原定时任务工具） |
 | `todo_toolkit` | `todo_add(title, detail)` / `todo_list(status?)` / `todo_update(todo_id, status)` / `todo_delete(todo_id)` | Todo 清单（个人待办, id+状态 pending/in_progress/completed, 持久化 data/todos/<role_id>.json） |
 | `task_view_toolkit` | `my_tasks(scope?)` | 任务列表（待处理队列 + 最近完成/失败历史, 只读视图） |
-| `drive_toolkit` | `drive_list(path?)` / `drive_upload(path, content)` / `drive_read(path)` / `drive_delete(path)` / `drive_rename(path, new_name)` / `drive_copy(src, dst)` / `drive_move(src, dst)` / `drive_search(keyword)` / `drive_set_permission(target_name, writable)` | 企业云盘（共享文件夹挂载每台电脑 /mnt/drive: Public 公用 777 + 各员工目录 755; 权限由 Linux 文件系统管理, 容器内用户名=员工拼音, 不同员工不同 uid） |
 | `time_toolkit` | `get_time()` / `take_rest()` | 查看作息时间 / 休息（无参数, 进入 ON_DUTY_IDLE, 事件自动唤醒） |
 | `mcp_manager` | `mcp_search(keyword)` / `mcp_list()` / `mcp_add(tool_name)` / `mcp_remove(tool_name)` / `mcp_my_tools()` | MCP 工具自助管理（搜索/添加/移除本地 MCP 工具，角色自动装配） |
 | `client_toolkit` | `talk_to_client(message)` | 与甲方实时交流（阻塞等待用户输入） |

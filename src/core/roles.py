@@ -69,7 +69,6 @@ def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
     global _TOOLKIT_BINDERS
     if _TOOLKIT_BINDERS is None:
         from src.python_tools.computer_toolkit import bind_computer_to_toolkit
-        from src.python_tools.drive_toolkit import bind_drive_to_toolkit
         from src.python_tools.hr_toolkit import bind_role_to_toolkit as bind_hr
         from src.python_tools.mcp_manager import bind_mcp_manager_to_toolkit
         from src.python_tools.memory_toolkit import bind_store_to_toolkit
@@ -87,7 +86,6 @@ def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
             "computer":      lambda tk, role: bind_computer_to_toolkit(tk, role),
             "todo":          lambda tk, role: bind_todo_to_toolkit(tk, role.todo_store),
             "task_view":     lambda tk, role: bind_task_view(tk, role),
-            "drive":         lambda tk, role: bind_drive_to_toolkit(tk, role),
         }
     return _TOOLKIT_BINDERS
 
@@ -292,6 +290,19 @@ class AgentRole:
         parts.append(
             "如果你有与其他人沟通的任务，请务必保证在指定时间与其沟通，"
             "不能提前也不能延后，因为其他人会认为你应该在此时与他沟通。"
+        )
+
+        # 公司云盘 (所有角色生效): /mnt/drive 挂载的共享文件夹
+        parts.append(
+            "公司云盘位于 /mnt/drive（每台电脑都挂载同一份共享文件夹）：\n"
+            "  - /mnt/drive/Public —— 公用共享目录，所有员工都可读写"
+            "（公共资源、公告、协作文件放这里）\n"
+            f"  - /mnt/drive/{self.name} —— 你的个人目录，只有你能写入；"
+            "其他员工只读\n"
+            "  - 其他员工的个人目录你也只有只读权限\n"
+            "文件操作直接用电脑的文件命令（ls / cat / cp / mv / rm 等）；"
+            "分享文件给同事：写入 Public，或用 talk 的 attachment 参数"
+            "发送云盘文件路径。"
         )
 
         if self.system_prompt_extra:
