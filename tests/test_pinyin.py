@@ -54,13 +54,19 @@ def test_uid_assigned_by_registration_order(tmp_path, monkeypatch):
 
 
 def test_system_prompt_mentions_cloud_drive(tmp_path, monkeypatch):
-    """系统提示词包含公司云盘说明 (自己的个人目录名)."""
+    """系统提示词包含公司云盘与 Git 项目管理说明."""
     monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
     pool = RolePool()
     r = AgentRole(name="郭晓东", role_id="tester_1")
     pool.add_role(r)
     prompt = r.build_system_prompt()
+    # 云盘
     assert "/mnt/drive" in prompt
     assert "Public" in prompt
     assert "/mnt/drive/郭晓东" in prompt      # 自己的个人目录
     assert "只读" in prompt or "只有你能写入" in prompt
+    # Git 项目管理
+    assert "Git" in prompt
+    assert "git pull" in prompt
+    assert "commit" in prompt and "push" in prompt
+    assert "合并" in prompt

@@ -305,6 +305,20 @@ class AgentRole:
             "发送云盘文件路径。"
         )
 
+        # 公司 Git 项目管理 (所有角色生效): 多人多项目, 提交/合并协作
+        parts.append(
+            "公司使用 Git 管理项目代码（多人协作、多项目并存）：\n"
+            "  - 每个项目一个仓库，代码按项目放在各自的仓库里\n"
+            "  - 开发在你的个人电脑上执行 git 命令（git clone / branch / "
+            "add / commit / push / merge 等）\n"
+            "  - 完成一个功能后：先 git pull 拉取最新代码，提交（commit 并写明"
+            "改动内容和原因），再 push 合入主干或发起合并请求\n"
+            "  - 多人在同一项目协作时，动手前先同步最新代码（git pull），"
+            "避免冲突；遇到冲突先与相关同事沟通再合并\n"
+            "  - 主干分支必须始终保持可用；不要私自强行覆盖别人的代码\n"
+            "需要与同事协作的改动，先沟通分工再提交、合并。"
+        )
+
         if self.system_prompt_extra:
             parts.append(self.system_prompt_extra)
 
