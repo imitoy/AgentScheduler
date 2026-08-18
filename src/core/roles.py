@@ -69,6 +69,7 @@ def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
     global _TOOLKIT_BINDERS
     if _TOOLKIT_BINDERS is None:
         from src.python_tools.computer_toolkit import bind_computer_to_toolkit
+        from src.python_tools.drive_toolkit import bind_drive_to_toolkit
         from src.python_tools.hr_toolkit import bind_role_to_toolkit as bind_hr
         from src.python_tools.mcp_manager import bind_mcp_manager_to_toolkit
         from src.python_tools.memory_toolkit import bind_store_to_toolkit
@@ -86,6 +87,7 @@ def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
             "computer":      lambda tk, role: bind_computer_to_toolkit(tk, role),
             "todo":          lambda tk, role: bind_todo_to_toolkit(tk, role.todo_store),
             "task_view":     lambda tk, role: bind_task_view(tk, role),
+            "drive":         lambda tk, role: bind_drive_to_toolkit(tk, role),
         }
     return _TOOLKIT_BINDERS
 
@@ -132,6 +134,8 @@ class AgentRole:
 
     name: str                                              # person name, e.g. "张三", "李四"
     role_id: str = ""                                      # functional role, e.g. "coder", "reviewer"
+    username: str = ""                                     # 容器/系统用户名 (名字的汉语拼音, 如 guoxiaodong); 空 = 自动查拼音表
+    uid: int = 0                                           # 容器内 uid (RolePool 注册时分配 1100+序号; 用于云盘文件所有权区分)
     title: str = ""                                        # e.g. "Senior Backend Engineer"
     responsibilities: str = ""                             # e.g. "编写代码，修复Bug，实现新功能"
     personality: str = ""                                  # e.g. "严谨细致，追求代码质量"
@@ -168,6 +172,17 @@ class AgentRole:
     # Callbacks
     on_task_start: Optional[Callable[[AgentRole, Task], None]] = field(default=None, repr=False, init=False)
     on_task_done: Optional[Callable[[AgentRole, Task], None]] = field(default=None, repr=False, init=False)
+
+    def __post_init__(self) -> None:
+        """补齐派生字段: username (拼音用户名) 与 uid (容器内用户号)."""
+        # 用户名: 优先显式指定; 否则按中文名查拼音表 (如 郭晓东 → guoxiaodong);
+        # 查不到回退 role_id (ASCII 安全), 兜底 agent
+        if not self.username:
+            from src.core.pinyin_map import NAME_PINYIN
+            self.username = NAME_PINYIN.get(self.name, self.role_id or "agent")
+        # uid: 0 = 未分配, 由 RolePool.add_role 注册时分配 (1100 + 注册序号)
+        if self.uid <= 0:
+            self.uid = 1100
 
     # 任务历史: 已完成/失败的任务留档 (对话/工作记录, StateStore 持久化)
     _task_history: list[Task] = field(default_factory=list, repr=False, init=False)
@@ -348,6 +363,8 @@ class AgentRole:
                 role_id=self.role_id,
                 name=self.name,  # 人名, 供内网设备列表展示
                 auto_mcp=True,   # 自动创建的电脑: 创建时自动安装独立 MCP 服务器
+                username=self.username,  # 容器内用户名 = 拼音 (云盘权限管理)
+                uid=self.uid,            # 容器内 uid (文件所有权区分)
                 **self.computer_kwargs,
             )
             if not self._computer.is_on:
@@ -702,6 +719,7 @@ class RolePool:
     def __init__(self, llm_api_key: Optional[str] = None, llm_model: Optional[str] = None,
                  llm_provider: Optional[str] = None, time_manager: Any = None):
         self._roles: dict[str, AgentRole] = {}
+        self._uid_counter: int = 0  # 容器内 uid 分配计数器 (1100 + 注册序号)
         # 每角色一个常驻 worker 线程 (角色空闲时 sleep 轮询, 线程不退出).
         # max_workers 必须 ≥ 最大角色数: 默认值 min(32, cpu+4) 只有 28,
         # 40 个角色时后注册的 12 个 worker 永远排不到线程 → 日志停在
@@ -725,6 +743,11 @@ class RolePool:
         if role.role_id in self._roles:
             raise ValueError(f"Role '{role.role_id}' already exists")
         self._roles[role.role_id] = role
+        # 容器内 uid 分配: 1100 + 注册序号 (每个员工一个固定 uid,
+        # 企业云盘文件所有权区分; 注册顺序稳定 → uid 跨重启稳定)
+        if role.uid <= 1100:  # 未显式指定 (默认 1100)
+            self._uid_counter += 1
+            role.uid = 1100 + self._uid_counter
         # 每个注册进池的角色都立即拥有专属活动日志 (data/journals/<role_id>.md),
         # 不等第一次活动 — 保证"所有角色都有一个专门的 log".
         role.journal(f"角色就位: {role.name} — {role.title or role.role_id}")

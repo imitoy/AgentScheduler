@@ -114,6 +114,8 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
         target = args.get("target", "")
         message = args.get("message", "")
         urgency_str = args.get("urgency", "NORMAL")
+        # attachment: 企业云盘路径 (指向共享文件夹 /mnt/drive 下内容, 发送时校验可读)
+        attachment = (args.get("attachment") or "").strip() or None
         # wait 参数: 模型可能传布尔或字符串 ("true"/"false"), 统一解析
         wait_val = args.get("wait", False)
         if isinstance(wait_val, str):
@@ -135,6 +137,21 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
         sender = sender.get("role") if sender is not None else None
         sender_id = sender.role_id if sender is not None else None
 
+        # ── 附件校验: 云盘路径必须存在且当前角色可读 (容器内以本人身份判定) ──
+        if attachment is not None:
+            if sender is None:
+                return "错误: 当前角色未绑定, 无法发送附件 (attachment)."
+            if (".." in attachment.split("/") or attachment.startswith("/")
+                    or attachment.endswith("/")):
+                return f"错误: 附件路径非法: '{attachment}' (须为云盘相对路径)"
+            try:
+                comp = sender.computer  # 惰性开机 (容器内以员工身份读取)
+                content = comp.read_file(f"{comp.drive_root}/{attachment}")
+            except Exception as exc:
+                return f"错误: 附件不可读: {exc}"
+            if content.startswith(("[exit", "错误", "文件不存在")):
+                return f"错误: 附件无效: 云盘文件不存在或不可读 '{attachment}'"
+
         # ── 1) 回复投递: 目标正处于 WAIT 且在等我回复 → 直接投递唤醒 ──
         #    等待者 worker 阻塞中, 回复绝不能入队 (否则永远收不到);
         #    wait 参数在此被忽略 — 回复本身不进入等待, 从根上拆解双向互等.
@@ -147,18 +164,26 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
             return f"已回复给正在等待的 {target_role.name}."
 
         # 构造任务: wait=true 时在消息中明确告知对方"提问者正在等待",
-        # 让目标知道当前情况 (LLM 输出时间不可预测, 发送方会一直等到回复)
+        # 让目标知道当前情况 (LLM 输出时间不可预测, 发送方会一直等到回复);
+        # attachment 附件为云盘路径, 消息里提示对方可用 drive_read 读取
         waiting_hint = ""
         if wait and sender is not None:
             waiting_hint = (
                 f"\n\n⚠️ {sender.name} 正在等待你的回复 (wait=true)。"
                 f"请优先处理这条消息, 尽快用 talk 工具回复对方。"
             )
+        attach_hint = ""
+        if attachment:
+            attach_hint = (
+                f"\n[附件: {attachment}] (企业云盘文件, "
+                f"可用 drive_read 工具读取内容)"
+            )
         task = Task(
             urgency=urgency,
-            description=f"[FROM talk] {message}{waiting_hint}",
+            description=f"[FROM talk] {message}{attach_hint}{waiting_hint}",
             source="talk",
-            context={"message": message, "waiting": bool(wait)},
+            context={"message": message, "waiting": bool(wait),
+                     "attachment": attachment},
         )
 
         # ── 2) wait=true: 无限等待对方回复 ──
@@ -215,6 +240,8 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
             "团队当前有哪些成员请先调用 list_roles 获取 (名单是动态的, 可能有新入职). "
             "根据每个人的职责选择合适的人选后, 用 target 发送.\n"
             "target 参数使用成员姓名 (见 list_roles 花名册, 例如 '王建国').\n"
+            "attachment 可选: 企业云盘文件路径 (如 'Public/方案.md' 或 '郭晓东/设计稿.md'), "
+            "作为附件随消息发送, 对方可用 drive_read 读取; 发送前系统会校验文件存在.\n"
             "wait=true 表示需要对方回复后才能继续 (同步等待): 你会进入 WAIT 状态, "
             "消息会附带'你正在等待回复'的提示, 对方收到后应尽快用 talk 回复你; "
             "收到回复后工具返回回复内容并恢复原状态. "
@@ -241,6 +268,10 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
                 "wait": {
                     "type": "boolean",
                     "description": "是否等待对方回复 (默认 false). true = 同步等待, 收到回复后继续.",
+                },
+                "attachment": {
+                    "type": "string",
+                    "description": "可选: 企业云盘文件路径 (如 'Public/方案.md'), 作为附件随消息发送",
                 },
             },
             "required": ["target", "message"],

@@ -43,8 +43,9 @@
 ┌──────────────────────────────────────────────────────────┐
 │      AgentRole + 个人电脑 + MCP 工具 + talk               │
 │   LLM(Task) → tool_calls → execute → role:tool 回喂       │
-│   电脑: podman 容器 maf-<role> (上班开机/下班关机)        │
-│   MCP 服务器跑在容器内, 授权 /home/agent                  │
+│   - 个人电脑: podman 容器 maf-<role> (上班开机/下班关机)        │
+│     容器内用户名 = 员工名字拼音 (guoxiaodong), 每员工独立 uid   │
+│   - 企业云盘: 共享文件夹挂载 /mnt/drive (Public 777 + 员工目录 755) │
 │   talk: inter-role communication                          │
 └──────────────────────────────────────────────────────────┘
 ```

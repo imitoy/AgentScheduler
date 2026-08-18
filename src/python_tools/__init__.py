@@ -29,6 +29,7 @@ from src.python_tools.memory_toolkit import create_memory_toolkit
 from src.python_tools.time_toolkit import create_time_toolkit
 from src.python_tools.todo_toolkit import create_todo_toolkit
 from src.python_tools.task_view_toolkit import create_task_view_toolkit
+from src.python_tools.drive_toolkit import create_drive_toolkit
 from src.python_tools.mcp_manager import MCPManager, create_mcp_manager_toolkit
 from src.python_tools.computer_toolkit import create_computer_toolkit
 from src.python_tools.skill_toolkit import SkillManager, create_skill_manager_toolkit
@@ -50,6 +51,7 @@ DEFAULT_TOOLKITS: dict[str, Callable[[], object]] = {
     "time": create_time_toolkit,
     "todo": create_todo_toolkit,       # Todo 清单 (个人待办, id+状态管理)
     "task_view": create_task_view_toolkit,   # 任务列表 (队列+历史视图)
+    "drive": create_drive_toolkit,           # 企业云盘 (/mnt/drive 共享文件夹)
     "computer": create_computer_toolkit,          # run_command / computer_status / reboot
     "mcp_manager": lambda: create_mcp_manager_toolkit(_MCP_MANAGER),
     "skill_manager": lambda: create_skill_manager_toolkit(_SKILL_MANAGER),

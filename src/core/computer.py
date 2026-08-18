@@ -256,6 +256,11 @@ class Computer(ABC):
         """个人工作目录 (电脑上的路径). 子类可覆盖."""
         return "/home/agent"
 
+    @property
+    def drive_root(self) -> str:
+        """企业云盘挂载根路径 (容器内 /mnt/drive; Local 降级为本地 data/drive)."""
+        return "/mnt/drive"
+
     def describe(self) -> str:
         """电脑状态描述 (供 LLM 查看)."""
         return (f"电脑[{self.role_id}] ({self.__class__.__name__}): "
@@ -285,6 +290,11 @@ class LocalComputer(Computer):
     @property
     def workdir(self) -> str:
         return str(self._dir)
+
+    @property
+    def drive_root(self) -> str:
+        # Local 降级: 云盘即本地共享目录 (权限语义退化为宿主机单用户)
+        return str((Path("./data/drive")).resolve())
 
     def power_on(self) -> str:
         self._on = True
@@ -360,9 +370,14 @@ class PodmanComputer(Computer):
     """
 
     def __init__(self, role_id: str, image: str = DEFAULT_IMAGE,
-                 auto_mcp: bool = False):
+                 auto_mcp: bool = False, username: str = "agent",
+                 uid: int = 1100, name: str = ""):
         super().__init__(role_id, auto_mcp=auto_mcp)
         self.image = image
+        self.username = username or "agent"      # 容器内用户名 = 员工名字的汉语拼音
+        self.uid = int(uid) or 1100              # 容器内 uid (文件所有权区分)
+        self._is_ceo = (role_id or "").upper() == "CEO"  # Public 目录属主 (CEO 的用户)
+        self.name = name                         # 角色中文名 (云盘个人目录名)
         self.container_name = f"maf-{role_id or 'shared'}"
         self._mcp_pkg_installed = False  # 容器内是否已预装 MCP 包 (真实属性)
         if shutil.which("podman") is None:
@@ -373,13 +388,19 @@ class PodmanComputer(Computer):
             )
 
     @property
+    def _drive_dir_name(self) -> str:
+        """云盘个人目录名: 员工名字 (根目录文件夹 = 各角色名字)."""
+        return self.name or self.username
+
+    @property
     def host_dir(self) -> str:
-        # 容器挂载的宿主机目录: data/computers/<role> ↔ 容器内 /home/agent
+        # 容器挂载的宿主机目录: data/computers/<role> ↔ 容器内 /home/<username>
         return str((Path("./data/computers").resolve() / (self.role_id or "shared")))
 
     @property
     def workdir(self) -> str:
-        return "/home/agent"
+        # 工作目录 = 员工家目录 (容器内用户名 = 拼音)
+        return f"/home/{self.username}"
 
     def get_lan_ip(self) -> str:
         """获取本电脑在自定义桥接网络 (maf-net) 中的 IP 地址.
@@ -422,7 +443,9 @@ class PodmanComputer(Computer):
                 package=MCP_FILESYSTEM_PACKAGE,
                 args=[self.workdir],  # 授权容器内工作目录
                 command="podman",
-                command_args=["exec", "-i", self.container_name, "node",
+                # 以员工用户运行: 文件写入按该用户 uid 判定 (云盘权限一致)
+                command_args=["exec", "-i", "--user", self.username,
+                              self.container_name, "node",
                               "/usr/local/bin/mcp-server-filesystem", self.workdir],
             )
             self._mcp_server.connect()
@@ -462,14 +485,21 @@ class PodmanComputer(Computer):
         )
 
     def _ensure_container(self) -> None:
-        """确保容器存在并运行 (不存在则创建), 并创建工作目录.
+        """确保容器存在并运行 (不存在则创建), 并创建工作目录/用户/云盘目录.
 
         每个 podman 调用都检查 returncode — 失败立即抛错, 不再静默
         吞掉 (否则系统照常运行, 笔记/总结实际没落盘却谎报已保存).
+
+        容器内用户名 = 员工名字的汉语拼音 (如 guoxiaodong), 每员工一个
+        固定 uid (1100+注册序): 所有 exec 命令以该用户身份执行, 企业云盘
+        (挂载 /mnt/drive) 的文件所有权按 uid 区分 — 权限由 Linux 文件系统管理.
         """
-        # 容器挂载宿主机目录: data/computers/<role> ↔ 容器内 /home/agent
+        # 容器挂载宿主机目录: data/computers/<role> ↔ 容器内 /home/<username>
         host_dir = self.host_dir
         Path(host_dir).mkdir(parents=True, exist_ok=True)
+        # 企业云盘共享目录 (所有容器挂载同一份): data/drive ↔ /mnt/drive
+        drive_host = _DRIVE_HOST
+        Path(drive_host).mkdir(parents=True, exist_ok=True)
         # 共享 npm 全局缓存: 挂载到容器 /root/.npm, 新容器预装 MCP 包时
         # 命中缓存秒装 (首个容器下载一次, 其余容器从缓存解压 — 40 角色并行
         # 加载时避免 40 次 npm 网络下载)
@@ -481,6 +511,7 @@ class PodmanComputer(Computer):
             r = self._pod("run", "-d", "--name", self.container_name,
                           "--network", network,
                           "-v", f"{host_dir}:{self.workdir}",
+                          "-v", f"{drive_host}:/mnt/drive",
                           "-v", f"{_NPM_CACHE_HOST}:/root/.npm",
                           self.image, "sleep", "infinity")
             if r.returncode != 0:
@@ -494,12 +525,34 @@ class PodmanComputer(Computer):
                 raise RuntimeError(
                     f"podman start 启动容器失败 ({r.returncode}): "
                     f"{(r.stderr or r.stdout or '').strip()[:300]}")
-        # 确保工作目录存在 (alpine 默认无 /home/agent, 挂载后即存在)
-        r = self._pod("exec", self.container_name, "sh", "-c",
-                      f"mkdir -p {shlex.quote(self.workdir)}")
+        # 容器内员工用户: 名字的汉语拼音 + 固定 uid; 家目录属主 = 该用户
+        # (挂载的宿主目录默认 root 所有, 不 chown 员工写不进去)
+        setup = (
+            f"grep -q '^{shlex.quote(self.username)}:' /etc/passwd || "
+            f"adduser -D -u {self.uid} -s /bin/sh {shlex.quote(self.username)} 2>/dev/null; "
+            f"mkdir -p {shlex.quote(self.workdir)}; "
+            f"chown -R {self.uid}:{self.uid} {shlex.quote(self.workdir)}"
+        )
+        r = self._pod("exec", self.container_name, "sh", "-c", setup)
         if r.returncode != 0:
             raise RuntimeError(
-                f"podman exec 创建工作目录失败 ({r.returncode}): "
+                f"podman exec 创建用户失败 ({r.returncode}): "
+                f"{(r.stderr or r.stdout or '').strip()[:300]}")
+        # 企业云盘初始化 (容器内 root 建目录 + 权限/属主):
+        #   - Public: 777 (公用共享), 属主 = CEO 的用户
+        #   - <本人名字>/: 755, 属主 = 本人 uid (其他员工只读, 本人可写)
+        drive_init = (
+            f"mkdir -p /mnt/drive/Public {shlex.quote('/mnt/drive/' + self._drive_dir_name)}; "
+            f"chmod 777 /mnt/drive/Public; "
+            f"chmod 755 {shlex.quote('/mnt/drive/' + self._drive_dir_name)}; "
+            f"chown {self.uid}:{self.uid} {shlex.quote('/mnt/drive/' + self._drive_dir_name)}"
+        )
+        if self._is_ceo:
+            drive_init += f"; chown {self.uid}:{self.uid} /mnt/drive/Public"
+        r = self._pod("exec", self.container_name, "sh", "-c", drive_init)
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"podman exec 初始化云盘失败 ({r.returncode}): "
                 f"{(r.stderr or r.stdout or '').strip()[:300]}")
         # 预装 MCP filesystem 服务器包 (容器内全局安装, 之后启动即用, 免 npx 拉包)
         if not self._mcp_pkg_installed:
@@ -539,7 +592,9 @@ class PodmanComputer(Computer):
         if not self._on:
             return "错误: 电脑未开机."
         try:
-            r = self._pod("exec", self.container_name, "sh", "-c", command)
+            # 以员工用户执行 (容器内用户名 = 拼音): 云盘/家目录权限按该用户判定
+            r = self._pod("exec", "--user", self.username,
+                          self.container_name, "sh", "-c", command)
             output = (r.stdout or "") + (r.stderr or "")
             if r.returncode != 0:
                 return f"[exit {r.returncode}] {output.strip()[:2000]}"
@@ -565,7 +620,8 @@ class PodmanComputer(Computer):
         parent = str(Path(path).parent) if "/" in path else "."
         try:
             r = subprocess.run(
-                ["podman", "exec", "-i", self.container_name, "sh", "-c",
+                ["podman", "exec", "-i", "--user", self.username,
+                 self.container_name, "sh", "-c",
                  'mkdir -p -- "$2" && cat > "$1"', "sh", path, parent],
                 capture_output=True, text=True, timeout=60, input=content,
             )
@@ -587,7 +643,8 @@ class PodmanComputer(Computer):
             return "错误: 电脑未开机."
         try:
             r = subprocess.run(
-                ["podman", "exec", self.container_name, "sh", "-c", script,
+                ["podman", "exec", "--user", self.username,
+                 self.container_name, "sh", "-c", script,
                  "sh", *args],
                 capture_output=True, text=True, timeout=timeout,
             )
@@ -755,6 +812,11 @@ def create_computer(kind: str = "podman", role_id: str = "", *,
 
 DEFAULT_NETWORK_NAME = "maf-net"  # podman 自定义桥接网络 (电脑间互通)
 
+# 企业云盘共享目录 (所有角色容器挂载同一份到 /mnt/drive):
+#   Public/   = 公用共享 (777, 属主 CEO 的用户)
+#   <名字>/   = 各员工个人目录 (755, 属主 = 对应员工)
+_DRIVE_HOST = str((Path("./data/drive")).resolve())
+
 # 共享 npm 全局缓存目录 (挂载进每个角色容器): 容器预装 MCP 包时命中缓存,
 # 避免 40 个新容器各自 npm 网络下载 (data/ 整体 gitignored, 不入库)
 _NPM_CACHE_HOST = str((Path("./data/computers") / ".npm-cache").resolve())
@@ -819,7 +881,7 @@ class ComputerManager:
         """
         self.ensure_network()
         comp = create_computer(kind=kind, role_id=role_id,
-                               auto_mcp=auto_mcp, **kwargs)
+                               auto_mcp=auto_mcp, name=name, **kwargs)
         self.register(comp, name=name)
         return comp
 
