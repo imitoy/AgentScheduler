@@ -57,7 +57,9 @@ def test_system_prompt_mentions_cloud_drive(tmp_path, monkeypatch):
     """系统提示词包含公司云盘与 Git 项目管理说明."""
     monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
     pool = RolePool()
-    r = AgentRole(name="郭晓东", role_id="tester_1")
+    # local 电脑: build_system_prompt → note_store → computer 会触发开机,
+    # podman 会走完整容器初始化 (apt+hermes, 数分钟) — 测试用本地模拟
+    r = AgentRole(name="郭晓东", role_id="tester_1", computer_kind="local")
     pool.add_role(r)
     prompt = r.build_system_prompt()
     # 云盘
@@ -77,6 +79,7 @@ def test_release_manager_prompt_mentions_project_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
     pool = RolePool()
     r = TEMPLATES["release_manager"]()
+    r.computer_kind = "local"  # 避免 build_system_prompt 触发 podman 开机
     pool.add_role(r)
     prompt = r.build_system_prompt()
     assert "/mnt/drive/Public/work/" in prompt

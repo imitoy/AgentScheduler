@@ -19,7 +19,8 @@ class _FakeComputer:
         self.outputs = list(outputs)
         self.commands: list[str] = []
 
-    def run_command(self, command: str, timeout: int = 60) -> str:
+    def run_command(self, command: str, timeout: int = 60,
+                    max_chars: int = 2000) -> str:
         self.commands.append(command)
         assert timeout >= 300, "hermes 命令应给足等待超时"
         return self.outputs.pop(0) if self.outputs else "(无输出)"
@@ -38,7 +39,10 @@ def _mk_toolkit(computer: _FakeComputer):
 def test_new_conversation_returns_sid(tmp_path, monkeypatch):
     """新建对话: 从 hermes chat 输出提取 session_id 返回."""
     monkeypatch.setattr("src.core.roles.JOURNAL_DIR", tmp_path / "journals")
-    fake = _FakeComputer(["20260818_123456_a1b2c3"])  # 管道 grep/awk 后 = 纯 sid
+    fake = _FakeComputer([
+        "好的，已开始新对话。\n\nResume this session with:\n"
+        "  hermes --resume 20260818_123456_a1b2c3",
+    ])
     pool, role, tk = _mk_toolkit(fake)
     r = tk._tools["hermes_new_conversation"].handler({})
     assert "对话已创建" in r
