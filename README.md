@@ -43,8 +43,9 @@
 ┌──────────────────────────────────────────────────────────┐
 │      AgentRole + 个人电脑 + MCP 工具 + talk               │
 │   LLM(Task) → tool_calls → execute → role:tool 回喂       │
-│   - 个人电脑: podman 容器 maf-<role> (上班开机/下班关机)        │
-│     容器内用户名 = 员工名字拼音 (guoxiaodong), 每员工独立 uid   │
+│   - 个人电脑: podman 容器 maf-<role> (Ubuntu 24.04, 上班开机/下班关机)  │
+│     容器内用户名 = 员工名字拼音 (guoxiaodong), 每员工独立 uid           │
+│     自带 sudo/git/node/python + Hermes Agent (hermes_new_conversation)  │
 │   - 企业云盘: 共享文件夹挂载 /mnt/drive (Public 777 + 员工目录 755) │
 │   talk: inter-role communication                          │
 └──────────────────────────────────────────────────────────┘
@@ -322,7 +323,7 @@ print(dev._tools.call_tool("lan_devices", {}))
 | DEEPSEEK_BASE_URL | https://api.deepseek.com | API 地址 |
 | LLM_PROVIDER | deepseek | LLM 后端: `deepseek` (云端) / `ollama` (本地) |
 | OLLAMA_BASE_URL | http://localhost:11434 | Ollama 服务地址 (OpenAI 兼容端点) |
-| OLLAMA_MODEL | gemma4:e4b-it-q4_K_M | 本地 Ollama 模型标签 |
+| OLLAMA_MODEL | gemma4:31b | 本地 Ollama 模型标签 |
 
 ### 使用本地 Ollama 模型
 
@@ -332,7 +333,7 @@ print(dev._tools.call_tool("lan_devices", {}))
 
 ```bash
 export LLM_PROVIDER=ollama                     # 全局切换后端
-export OLLAMA_MODEL=gemma4:e4b-it-q4_K_M       # 默认即此, 可省略
+export OLLAMA_MODEL=gemma4:31b       # 默认即此, 可省略
 ollama serve                                    # 确保本地服务在跑
 python src/role_demo.py                         # 示例: 多角色系统全走本地模型
 ```

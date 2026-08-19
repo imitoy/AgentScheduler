@@ -389,6 +389,7 @@ tk.tool_names / tk.tool_count / tk.get_tool(name) / __iter__ / __contains__
 | `memory_toolkit` | `summary(content, day)` / `write_note(title, content, remind_tick, remind_day)` / `edit_note` / `list_notes` / `read_note` | 每日总结（保存后切 OFF_DUTY）+ 笔记（**带 remind_tick = 定时提醒**，已合并原定时任务工具） |
 | `todo_toolkit` | `todo_add(title, detail)` / `todo_list(status?)` / `todo_update(todo_id, status)` / `todo_delete(todo_id)` | Todo 清单（个人待办, id+状态 pending/in_progress/completed, 持久化 data/todos/<role_id>.json） |
 | `task_view_toolkit` | `my_tasks(scope?)` | 任务列表（待处理队列 + 最近完成/失败历史, 只读视图） |
+| `hermes_toolkit` | `hermes_new_conversation()` / `hermes_send(conversation_id, content)` | 调用电脑上安装的 Hermes Agent：新建对话返回对话 id, 发送对话同步等待 Hermes 跑完返回全部结果 |
 | `time_toolkit` | `get_time()` / `take_rest()` | 查看作息时间 / 休息（无参数, 进入 ON_DUTY_IDLE, 事件自动唤醒） |
 | `mcp_manager` | `mcp_search(keyword)` / `mcp_list()` / `mcp_add(tool_name)` / `mcp_remove(tool_name)` / `mcp_my_tools()` | MCP 工具自助管理（搜索/添加/移除本地 MCP 工具，角色自动装配） |
 | `client_toolkit` | `talk_to_client(message)` | 与甲方实时交流（阻塞等待用户输入） |
@@ -440,7 +441,7 @@ loader.close()
 
 ```python
 DeepSeekLLM(api_key=None, model=None)   # 默认从环境变量 DEEPSEEK_API_KEY / DEEPSEEK_MODEL
-OllamaLLM(model=None)                   # 本地 Ollama, 默认 gemma4:e4b-it-q4_K_M, 免 API Key
+OllamaLLM(model=None)                   # 本地 Ollama, 默认 gemma4:31b, 免 API Key
 ```
 
 | 方法 | 参数 | 返回 |
@@ -450,7 +451,7 @@ OllamaLLM(model=None)                   # 本地 Ollama, 默认 gemma4:e4b-it-q4
 | `chat_with_tools(messages, tools)` | list, list | `(content, tool_calls, usage)` |
 
 环境变量: `DEEPSEEK_API_KEY`（必填）、`DEEPSEEK_MODEL`（默认 deepseek-v4-flash）、`DEEPSEEK_THINKING`（默认 true，思考模式）;
-`LLM_PROVIDER`（deepseek/ollama，切换后端）、`OLLAMA_BASE_URL`（默认 http://localhost:11434）、`OLLAMA_MODEL`（默认 gemma4:e4b-it-q4_K_M）。
+`LLM_PROVIDER`（deepseek/ollama，切换后端）、`OLLAMA_BASE_URL`（默认 http://localhost:11434）、`OLLAMA_MODEL`（默认 gemma4:31b）。
 
 ---
 

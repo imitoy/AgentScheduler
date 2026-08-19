@@ -2,7 +2,7 @@
 
 两个后端都走 OpenAI 兼容的 chat/completions 接口 (OpenAI 格式):
   - DeepSeekLLM: DeepSeek V4 Flash, 可选 thinking (推理) 模式, 需 API Key.
-  - OllamaLLM:   本地 Ollama 服务, 默认 gemma4:e4b-it-q4_K_M, 免 API Key.
+  - OllamaLLM:   本地 Ollama 服务, 默认 gemma4:31b, 免 API Key.
 
 公共接口 (与 MockLLM 同形):
   - chat(system, user) → (response_text, tokens_consumed)
@@ -33,7 +33,7 @@ DEEPSEEK_THINKING = os.environ.get("DEEPSEEK_THINKING", "true").lower() in ("1",
 
 # 本地 Ollama (OpenAI 兼容端点, 免 API Key)
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:e4b-it-q4_K_M")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
 
 DEFAULT_MAX_TOKENS = 512
 DEFAULT_TEMPERATURE = 0.7
@@ -459,7 +459,7 @@ class OllamaLLM(OpenAICompatLLM):
     """本地 Ollama 客户端 (OpenAI 兼容端点, 免 API Key).
 
     用法:
-        llm = OllamaLLM()   # 默认连接本地 http://localhost:11434 的 gemma4:e4b-it-q4_K_M
+        llm = OllamaLLM()   # 默认连接本地 http://localhost:11434 的 gemma4:31b
         text, tokens = llm.chat(system="You are helpful.", user="Hello")
         content, raw_calls, usage = llm.chat_with_tools(messages, tools)
 
@@ -471,7 +471,7 @@ class OllamaLLM(OpenAICompatLLM):
     参数:
         api_key: 兼容参数, 一般留空 (传了也会作为 Bearer 头发送).
         base_url: Ollama 服务地址 (默认 OLLAMA_BASE_URL = http://localhost:11434).
-        model: 模型标签 (默认 OLLAMA_MODEL = gemma4:e4b-it-q4_K_M).
+        model: 模型标签 (默认 OLLAMA_MODEL = gemma4:31b).
         label: 角色标识 (DEBUG 日志前缀).
     """
 
@@ -480,5 +480,5 @@ class OllamaLLM(OpenAICompatLLM):
     BASE_URL_ENV = "OLLAMA_BASE_URL"
     MODEL_ENV = "OLLAMA_MODEL"
     DEFAULT_BASE_URL = "http://localhost:11434"
-    DEFAULT_MODEL = "gemma4:e4b-it-q4_K_M"
+    DEFAULT_MODEL = "gemma4:31b"
     REQUIRES_API_KEY = False

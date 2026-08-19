@@ -71,6 +71,7 @@ def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
     global _TOOLKIT_BINDERS
     if _TOOLKIT_BINDERS is None:
         from src.python_tools.computer_toolkit import bind_computer_to_toolkit
+        from src.python_tools.hermes_toolkit import bind_hermes_to_toolkit
         from src.python_tools.hr_toolkit import bind_role_to_toolkit as bind_hr
         from src.python_tools.mcp_manager import bind_mcp_manager_to_toolkit
         from src.python_tools.memory_toolkit import bind_store_to_toolkit
@@ -88,6 +89,7 @@ def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
             "computer":      lambda tk, role: bind_computer_to_toolkit(tk, role),
             "todo":          lambda tk, role: bind_todo_to_toolkit(tk, role.todo_store),
             "task_view":     lambda tk, role: bind_task_view(tk, role),
+            "hermes":        lambda tk, role: bind_hermes_to_toolkit(tk, role),
         }
     return _TOOLKIT_BINDERS
 

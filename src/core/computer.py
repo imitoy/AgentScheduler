@@ -318,20 +318,21 @@ class LocalComputer(Computer):
             p = self._dir / p
         return p
 
-    def run_command(self, command: str) -> str:
+    def run_command(self, command: str, timeout: int = 30,
+                    max_chars: int = 2000) -> str:
         if not self._on:
             return "错误: 电脑未开机."
         try:
             result = subprocess.run(
                 command, shell=True, cwd=self._dir, capture_output=True,
-                text=True, timeout=30,
+                text=True, timeout=timeout,
             )
             output = (result.stdout or "") + (result.stderr or "")
             if result.returncode != 0:
                 return f"[exit {result.returncode}] {output.strip()[:2000]}"
-            return output.strip()[:2000] or "(无输出)"
+            return output.strip()[:max_chars] or "(无输出)"
         except subprocess.TimeoutExpired:
-            return "错误: 命令超时 (30s)."
+            return f"错误: 命令超时 ({timeout}s)."
         except Exception as exc:
             return f"错误: {exc}"
 
@@ -567,7 +568,10 @@ class PodmanComputer(Computer):
             "if ! command -v npm >/dev/null 2>&1; then "
             "apt-get update -qq && DEBIAN_FRONTEND=noninteractive "
             "apt-get install -y -qq -o DPkg::Lock::Timeout=600 "
-            "sudo git nodejs npm python3 python3-pip; fi; "
+            "sudo git nodejs npm python3 python3-pip "
+            # hermes 安装依赖: curl (下载脚本) + xz-utils (tar 解压
+            # .tar.xz) + libatomic1 (Hermes 自带 Node 26 运行库)
+            "curl xz-utils libatomic1; fi; "
             # 3) 员工用户 + sudo 组 (幂等)
             f"id -u {shlex.quote(self.username)} >/dev/null 2>&1 || "
             f"useradd -m -s /bin/bash -u {self.uid} -G sudo "
@@ -578,7 +582,15 @@ class PodmanComputer(Computer):
             f"/etc/sudoers.d/{shlex.quote(self.username)}; "
             # 5) 家目录属主 = 员工 (挂载目录默认 root 所有, 不 chown 写不进去)
             f"mkdir -p {shlex.quote(self.workdir)}; "
-            f"chown -R {self.uid}:{self.uid} {shlex.quote(self.workdir)}"
+            f"chown -R {self.uid}:{self.uid} {shlex.quote(self.workdir)}; "
+            # 6) 安装 Hermes Agent (幂等; 装到 /usr/local/bin 全局 PATH,
+            #    员工用户可直接用). install.sh 需下载 node 26 (nodejs.org)
+            #    + hermes 本体, 网络抖动时重试最多 3 次
+            "if ! command -v hermes >/dev/null 2>&1; then "
+            "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
+            "-o /tmp/hermes-install.sh 2>/dev/null && "
+            "for i in 1 2 3; do bash /tmp/hermes-install.sh >/dev/null 2>&1 "
+            "&& break || sleep 5; done; fi"
         )
         r = self._pod("exec", self.container_name, "sh", "-c", setup,
                       timeout=600)  # apt 首次安装包较多, 超时要给足
@@ -636,17 +648,19 @@ class PodmanComputer(Computer):
         except Exception as exc:
             return f"错误: 关机失败 - {exc}"
 
-    def run_command(self, command: str) -> str:
+    def run_command(self, command: str, timeout: int = 60,
+                    max_chars: int = 2000) -> str:
         if not self._on:
             return "错误: 电脑未开机."
         try:
             # 以员工用户执行 (容器内用户名 = 拼音): 云盘/家目录权限按该用户判定
             r = self._pod("exec", "--user", self.username,
-                          self.container_name, "sh", "-c", command)
+                          self.container_name, "sh", "-c", command,
+                          timeout=timeout)
             output = (r.stdout or "") + (r.stderr or "")
             if r.returncode != 0:
                 return f"[exit {r.returncode}] {output.strip()[:2000]}"
-            return output.strip()[:2000] or "(无输出)"
+            return output.strip()[:max_chars] or "(无输出)"
         except Exception as exc:
             return f"错误: 命令执行失败 - {exc}"
 
