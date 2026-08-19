@@ -37,7 +37,9 @@ logger = logging.getLogger(__name__)
 # 防止 LLM 陷入"反复调工具/解析失败重来"的退化循环: 无限轮次 + 无输出上限
 # 会无限烧 Token. 超限时抛 ToolLoopError → 任务标记 failed, 错误文本不当结果.
 MAX_TOOL_ROUNDS = 20              # 最多工具调用轮数
-MAX_TOOL_TOTAL_TOKENS = 200_000   # 单任务累计 Token 上限 (含 thinking 推理 token)
+# 单任务累计 Token 上限 (含 thinking 推理 token).
+# 暂时放开 (None = 不限制): 已有上下文优化方案, 限制后续再加回.
+MAX_TOOL_TOTAL_TOKENS: Optional[int] = None
 
 # LLM 调用失败时的错误文本标记 (llm.py 超时/异常时返回这些前缀)
 LLM_ERROR_MARKERS = ("[API timeout]", "[API error:")
@@ -650,8 +652,10 @@ class AgentRole:
             round_tokens = usage.get("total_tokens", 0) if usage else 0
             total_tokens += round_tokens
 
-            # 累计 Token 上限: 超限同样终止 (LLM 退化循环时会持续烧 token)
-            if total_tokens > MAX_TOOL_TOTAL_TOKENS:
+            # 累计 Token 上限: 超限同样终止 (LLM 退化循环时会持续烧 token).
+            # 当前暂时放开 (MAX_TOOL_TOTAL_TOKENS=None), 上限后续再加回
+            _token_limit = MAX_TOOL_TOTAL_TOKENS
+            if _token_limit is not None and total_tokens > _token_limit:
                 raise ToolLoopError(
                     f"工具调用累计 {total_tokens} tokens 超过上限 "
                     f"{MAX_TOOL_TOTAL_TOKENS}, 任务失败")

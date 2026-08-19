@@ -39,7 +39,7 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 # 默认 podman 镜像 (node:22-alpine: 轻量且带 node/npx, MCP 服务器在容器内跑)
-DEFAULT_IMAGE = "node:22-alpine"
+DEFAULT_IMAGE = "ubuntu:24.04"  # 员工电脑: Ubuntu (Debian 系, AI 更熟悉)
 
 # MCP filesystem 服务器包 (容器内全局安装, 避免每次 npx 拉包)
 MCP_FILESYSTEM_PACKAGE = "@modelcontextprotocol/server-filesystem"
@@ -448,12 +448,12 @@ class PodmanComputer(Computer):
             # 包已由 _ensure_container 预装到 /usr/local/bin, node 直启秒起)
             self._mcp_server = MCPServer(
                 package=MCP_FILESYSTEM_PACKAGE,
-                args=[self.workdir],  # 授权容器内工作目录
+                args=["/"],  # 授权容器内全部文件 (员工个人电脑, 全盘开放)
                 command="podman",
                 # 以员工用户运行: 文件写入按该用户 uid 判定 (云盘权限一致)
                 command_args=["exec", "-i", "--user", self.username,
                               self.container_name, "node",
-                              "/usr/local/bin/mcp-server-filesystem", self.workdir],
+                              "/usr/local/bin/mcp-server-filesystem", "/"],
             )
             self._mcp_server.connect()
             tools = self._mcp_server.list_tools()
@@ -511,6 +511,9 @@ class PodmanComputer(Computer):
         # 命中缓存秒装 (首个容器下载一次, 其余容器从缓存解压 — 40 角色并行
         # 加载时避免 40 次 npm 网络下载)
         Path(_NPM_CACHE_HOST).mkdir(parents=True, exist_ok=True)
+        # 注意: apt 缓存不做共享挂载 — 多个容器并行 apt-get 写同一缓存目录
+        # 会互相踩坏半成品 .deb (CEO 容器 npm 未装上即此因); 阿里源下载
+        # 快, 每个容器独立 apt 即可 (一次性成本, 容器持久化后不再触发)
         r = self._pod("ps", "-a", "--format", "{{.Names}}")
         # 精确名字检查: 不能依赖 --filter name=X (子串/正则匹配,
         # maf-tester_1 会误匹配 maf-tester_12 → 误判存在跳过创建)
@@ -548,18 +551,40 @@ class PodmanComputer(Computer):
                 raise RuntimeError(
                     f"podman start 启动容器失败 ({r.returncode}): "
                     f"{(r.stderr or r.stdout or '').strip()[:300]}")
-        # 容器内员工用户: 名字的汉语拼音 + 固定 uid; 家目录属主 = 该用户
-        # (挂载的宿主目录默认 root 所有, 不 chown 员工写不进去)
+        # Ubuntu 初始化 (容器内 root, 幂等): 阿里源 → 装基础工具 → 员工用户+sudo 组
+        #   - 镜像源: archive/security.ubuntu.com → mirrors.aliyun.com (deb822 格式)
+        #   - 默认安装: sudo, git, nodejs, npm, python3 (员工电脑标配)
+        #   - 员工用户: 拼音用户名 + 固定 uid, 加入 sudo 组并配置免密 sudo
+        #     (电脑是员工个人的, 允许提权; sudo 组保证 git/apt 等管理操作可用)
         setup = (
-            f"grep -q '^{shlex.quote(self.username)}:' /etc/passwd || "
-            f"adduser -D -u {self.uid} -s /bin/sh {shlex.quote(self.username)} 2>/dev/null; "
+            # 1) 阿里源 (幂等: 已替换则跳过)
+            "grep -q mirrors.aliyun.com /etc/apt/sources.list.d/ubuntu.sources "
+            "2>/dev/null || sed -i 's|^URIs:.*|URIs: http://mirrors.aliyun.com/ubuntu/|' "
+            "/etc/apt/sources.list.d/ubuntu.sources 2>/dev/null; "
+            # 2) 装基础工具 (幂等: npm 存在即跳过). 用 if 显式检查 —
+            #    apt 失败必须让 setup 返回非 0 (之前的 `|| (...)` 会被
+            #    后面的 chown 掩盖退出码, 导致 npm 未装却继续走 MCP 预装)
+            "if ! command -v npm >/dev/null 2>&1; then "
+            "apt-get update -qq && DEBIAN_FRONTEND=noninteractive "
+            "apt-get install -y -qq -o DPkg::Lock::Timeout=600 "
+            "sudo git nodejs npm python3 python3-pip; fi; "
+            # 3) 员工用户 + sudo 组 (幂等)
+            f"id -u {shlex.quote(self.username)} >/dev/null 2>&1 || "
+            f"useradd -m -s /bin/bash -u {self.uid} -G sudo "
+            f"{shlex.quote(self.username)}; "
+            # 4) 免密 sudo (员工个人电脑, 提权不输密码)
+            f"[ -f /etc/sudoers.d/{shlex.quote(self.username)} ] || "
+            f"echo '{self.username} ALL=(ALL) NOPASSWD:ALL' > "
+            f"/etc/sudoers.d/{shlex.quote(self.username)}; "
+            # 5) 家目录属主 = 员工 (挂载目录默认 root 所有, 不 chown 写不进去)
             f"mkdir -p {shlex.quote(self.workdir)}; "
             f"chown -R {self.uid}:{self.uid} {shlex.quote(self.workdir)}"
         )
-        r = self._pod("exec", self.container_name, "sh", "-c", setup)
+        r = self._pod("exec", self.container_name, "sh", "-c", setup,
+                      timeout=600)  # apt 首次安装包较多, 超时要给足
         if r.returncode != 0:
             raise RuntimeError(
-                f"podman exec 创建用户失败 ({r.returncode}): "
+                f"podman exec 初始化系统失败 ({r.returncode}): "
                 f"{(r.stderr or r.stdout or '').strip()[:300]}")
         # 企业云盘初始化 (容器内 root 建目录 + 权限/属主):
         #   - Public: 777 (公用共享), 属主 = CEO 的用户
@@ -847,6 +872,10 @@ _DRIVE_HOST = str((Path("./data/drive")).resolve())
 # 共享 npm 全局缓存目录 (挂载进每个角色容器): 容器预装 MCP 包时命中缓存,
 # 避免 40 个新容器各自 npm 网络下载 (data/ 整体 gitignored, 不入库)
 _NPM_CACHE_HOST = str((Path("./data/computers") / ".npm-cache").resolve())
+
+# 共享 apt 包缓存 (Ubuntu 容器换阿里源后装 sudo/git/node/python 时命中,
+# 首个容器下载 deb, 其余容器从缓存秒装)
+_APT_CACHE_HOST = str((Path("./data/computers") / ".apt-cache").resolve())
 
 
 class ComputerManager:

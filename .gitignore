@@ -7,6 +7,8 @@ data/notes/
 data/computers/
 data/main_run.log
 data/skills/
+data/todos/
+data/drive/
 .DS_Store
 *.egg-info/
 dist/

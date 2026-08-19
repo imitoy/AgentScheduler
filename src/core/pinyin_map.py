@@ -59,4 +59,10 @@ NAME_PINYIN: dict[str, str] = {
     "严冬": "yandong",          # attacker_2
     "纪安": "jian",             # attacker_3
     "方谨言": "fangjinyan",     # release_manager
+    "高远": "gaoyuan",           # CTO
+    "陈思远": "chensiyuan",      # frontend_lead
+    "王宇轩": "wangyuxuan",      # backend_lead
+    "李俊杰": "lijunjie",        # fullstack_lead
+    "张雅婷": "zhangyating",     # mobile_lead
+    "刘子涵": "liuzihan",        # test_lead
 }
