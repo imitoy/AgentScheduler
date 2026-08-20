@@ -951,15 +951,18 @@ apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o DPkg::Lock::Timeout=600 \
   sudo git nodejs npm python3 python3-pip curl xz-utils libatomic1
 # 3) Hermes Agent (装到 /usr/local/bin 全局, 员工用户可用).
-#    nodejs.org 下载 node 26 可能卡顿 (SSL 抖动时 install.sh 内部 curl
-#    无超时会挂死): curl 加超时 + timeout 包裹 install.sh (单次 400s),
-#    重试 2 次 — 避免基础镜像初始化被拖到 exec 超时 (1200s).
+#    install.sh 用 git clone 从 github.com 拉源码 — 该域名 TLS 常被重置
+#    (gnutls_handshake failed), 实测 ghfast.top 镜像可用: 用 git 全局
+#    url.insteadOf 重写, install.sh 内部 git clone 自动走镜像.
+#    node 26 从 nodejs.org 下载也可能卡顿: curl/install.sh 均加超时,
+#    重试 2 次 — 避免基础镜像初始化被拖到 exec 超时.
+git config --global url."https://ghfast.top/https://github.com/".insteadOf "https://github.com/"
 if ! command -v hermes >/dev/null 2>&1; then
   curl -fsSL --connect-timeout 20 --max-time 240 \
     https://hermes-agent.nousresearch.com/install.sh \
     -o /tmp/hermes-install.sh 2>/dev/null
   for i in 1 2; do
-    timeout 400 bash /tmp/hermes-install.sh >/dev/null 2>&1 && break || sleep 3
+    timeout 600 bash /tmp/hermes-install.sh >/dev/null 2>&1 && break || sleep 3
   done
 fi
 command -v hermes >/dev/null 2>&1 || { echo "Hermes 安装失败" >&2; exit 1; }
@@ -1042,11 +1045,12 @@ class ComputerManager:
                     f"创建基础容器失败 ({r.returncode}): "
                     f"{(r.stderr or r.stdout or '').strip()[:300]}")
             try:
-                # 系统级初始化 (apt 装包 + hermes 下载, 给足超时)
+                # 系统级初始化 (apt 装包 + hermes 安装, 给足超时:
+                # install.sh 单次 600s × 2 次重试 + apt ~200s)
                 r = subprocess.run(
                     ["podman", "exec", BASE_CONTAINER_NAME, "bash", "-c",
                      _BASE_INIT_SCRIPT],
-                    capture_output=True, text=True, timeout=1200)
+                    capture_output=True, text=True, timeout=1800)
                 if r.returncode != 0 or "BASE_INIT_OK" not in (r.stdout or ""):
                     raise RuntimeError(
                         f"基础容器初始化失败 ({r.returncode}): "
