@@ -22,8 +22,74 @@ create_computer() 工厂按角色 computer_kind 选择实现.
     comp = create_computer("podman", role_id="CEO")
     comp.power_on()
     comp.run_command("ls -la")
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_computer(): 按类型创建电脑实例.
+
+类与方法:
+    Computer:
+        - power_on(): 开机. 返回状态说明.
+        - power_off(): 关机. 返回状态说明.
+        - run_command(): 运行命令 (在个人电脑上执行). 返回命令输出.
+        - read_file(): 读取个人电脑上的文件内容.
+        - write_file(): 写入个人电脑上的文件 (自动创建父目录). 返回路径.
+        - list_dir(): 列出个人电脑指定目录内容 (默认工作目录).
+        - delete_file(): 删除个人电脑上的文件. 返回状态说明 (成功/错误).
+        - host_dir(): 宿主机上该电脑工作目录的映射路径 (MCP 服务器授权目录).
+        - install_mcp_server(): 在本电脑上安装独立的 MCP 服务器 (filesystem, 授权本电脑目录).
+        - uninstall_mcp_tool(): 从本电脑卸载一个 MCP 工具. 返回是否卸载成功.
+        - list_installed_mcp_tools(): 列出本电脑已安装的 MCP 工具名 (排序).
+        - run_mcp_tool(): 运行 MCP 工具 (在本电脑上执行).
+        - is_on(): 电脑是否开机.
+        - reboot(): 重启电脑 (关机后再开机). 所有实现通用.
+        - workdir(): 个人工作目录 (电脑上的路径). 子类可覆盖.
+        - drive_root(): 企业云盘挂载根路径 (容器内 /mnt/drive; Local 降级为本地 data/drive).
+        - describe(): 电脑状态描述 (供 LLM 查看).
+    LocalComputer:
+        - host_dir(): 见方法源码
+        - workdir(): 见方法源码
+        - drive_root(): 见方法源码
+        - power_on(): 见方法源码
+        - power_off(): 见方法源码
+        - run_command(): 见方法源码
+        - read_file(): 见方法源码
+        - write_file(): 见方法源码
+        - list_dir(): 见方法源码
+        - delete_file(): 见方法源码
+    PodmanComputer:
+        - host_dir(): 见方法源码
+        - workdir(): 见方法源码
+        - get_lan_ip(): 获取本电脑在自定义桥接网络 (maf-net) 中的 IP 地址.
+        - install_mcp_server(): 在本电脑 (容器) 内安装独立的 MCP 服务器.
+        - power_on(): 见方法源码
+        - power_off(): 见方法源码
+        - run_command(): 见方法源码
+        - read_file(): 见方法源码
+        - write_file(): 写入容器内文件: 内容经 stdin (exec -i), 路径经 argv ($1/$2).
+        - list_dir(): 见方法源码
+        - delete_file(): 见方法源码
+        - describe(): 见方法源码
+    SSHComputer:
+        - workdir(): 见方法源码
+        - power_on(): 见方法源码
+        - power_off(): 见方法源码
+        - run_command(): 见方法源码
+        - read_file(): 见方法源码
+        - write_file(): 写入远程文件: 内容经 stdin 传入 ssh, 路径 shlex.quote (同 Podman 版).
+        - list_dir(): 见方法源码
+        - delete_file(): 见方法源码
+    ComputerManager:
+        - ensure_network(): 确保 podman 自定义桥接网络存在 (幂等). 返回网络名.
+        - ensure_base_image(): 确保基础镜像存在 (maf-base:latest). 返回镜像名.
+        - create(): 创建并注册一台角色电脑 (分配).
+        - register(): 注册一台已创建的电脑到管理器.
+        - get(): 按角色 ID 获取电脑 (不存在抛 KeyError).
+        - list_all(): 返回全部已注册电脑列表 (按注册顺序).
+        - destroy(): 销毁角色电脑: 关机 + 删除容器 + 注销. 返回是否销毁成功.
+        - list_lan_devices(): 列出内网电脑设备: 人名 / 电脑名 / IP.
+"""
 from __future__ import annotations
 
 import logging
@@ -38,8 +104,16 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# 默认 podman 镜像 (node:22-alpine: 轻量且带 node/npx, MCP 服务器在容器内跑)
-DEFAULT_IMAGE = "ubuntu:24.04"  # 员工电脑: Ubuntu (Debian 系, AI 更熟悉)
+# 默认 podman 镜像 (ubuntu:24.04: 员工电脑基础, AI 熟悉 Debian 系).
+# 角色容器不从它直接创建, 而是从基础镜像 maf-base 复制 (见 BASE_IMAGE).
+DEFAULT_IMAGE = "ubuntu:24.04"
+
+# 基础镜像: 先创建基础容器 → 系统级初始化 (阿里源/apt 包/hermes/MCP 包)
+# → commit 成 maf-base:latest → 角色容器从该镜像复制 (秒建, 只补员工用户).
+# 避免 40 个角色各自 apt 下载 + hermes 安装 (单容器初始化约 10 分钟).
+BASE_IMAGE = "maf-base:latest"
+BASE_CONTAINER_NAME = "maf-base-init"  # 基础容器临时名 (初始化后删除)
+_BASE_IMAGE_LOCK = threading.Lock()    # 并发保护: 首个调用者建镜像, 其余等待复用
 
 # MCP filesystem 服务器包 (容器内全局安装, 避免每次 npx 拉包)
 MCP_FILESYSTEM_PACKAGE = "@modelcontextprotocol/server-filesystem"
@@ -508,13 +582,11 @@ class PodmanComputer(Computer):
         # 企业云盘共享目录 (所有容器挂载同一份): data/drive ↔ /mnt/drive
         drive_host = _DRIVE_HOST
         Path(drive_host).mkdir(parents=True, exist_ok=True)
-        # 共享 npm 全局缓存: 挂载到容器 /root/.npm, 新容器预装 MCP 包时
-        # 命中缓存秒装 (首个容器下载一次, 其余容器从缓存解压 — 40 角色并行
-        # 加载时避免 40 次 npm 网络下载)
+        # 共享 npm 全局缓存: 挂载到容器 /root/.npm (旧容器预装 MCP 包时命中)
         Path(_NPM_CACHE_HOST).mkdir(parents=True, exist_ok=True)
-        # 注意: apt 缓存不做共享挂载 — 多个容器并行 apt-get 写同一缓存目录
-        # 会互相踩坏半成品 .deb (CEO 容器 npm 未装上即此因); 阿里源下载
-        # 快, 每个容器独立 apt 即可 (一次性成本, 容器持久化后不再触发)
+        # 确保基础镜像存在 (系统层: 阿里源/apt 包/hermes/MCP 包, 一次性
+        # 初始化; 角色容器从它复制秒建, 只补员工用户). 并发下加锁双检.
+        image = _COMPUTER_MANAGER.ensure_base_image()
         r = self._pod("ps", "-a", "--format", "{{.Names}}")
         # 精确名字检查: 不能依赖 --filter name=X (子串/正则匹配,
         # maf-tester_1 会误匹配 maf-tester_12 → 误判存在跳过创建)
@@ -531,7 +603,7 @@ class PodmanComputer(Computer):
                               "-v", f"{host_dir}:{self.workdir}",
                               "-v", f"{drive_host}:/mnt/drive",
                               "-v", f"{_NPM_CACHE_HOST}:/root/.npm",
-                              self.image, "sleep", "infinity")
+                              image, "sleep", "infinity")
                 if r.returncode == 0:
                     break
                 logger.warning(
@@ -552,51 +624,27 @@ class PodmanComputer(Computer):
                 raise RuntimeError(
                     f"podman start 启动容器失败 ({r.returncode}): "
                     f"{(r.stderr or r.stdout or '').strip()[:300]}")
-        # Ubuntu 初始化 (容器内 root, 幂等): 阿里源 → 装基础工具 → 员工用户+sudo 组
-        #   - 镜像源: archive/security.ubuntu.com → mirrors.aliyun.com (deb822 格式)
-        #   - 默认安装: sudo, git, nodejs, npm, python3 (员工电脑标配)
-        #   - 员工用户: 拼音用户名 + 固定 uid, 加入 sudo 组并配置免密 sudo
-        #     (电脑是员工个人的, 允许提权; sudo 组保证 git/apt 等管理操作可用)
+        # 员工用户级初始化 (基础镜像已含全部系统包/hermes, 这里只补:
+        #   拼音用户 + sudo 组免密 + 家目录属主). 幂等, 毫秒级.
+        # 旧容器 (直接 ubuntu:24.04 建的) 也会走到这里 — 用户级幂等兼容,
+        # 但系统包可能缺失 (旧容器已初始化过, 一般无此情况)
         setup = (
-            # 1) 阿里源 (幂等: 已替换则跳过)
-            "grep -q mirrors.aliyun.com /etc/apt/sources.list.d/ubuntu.sources "
-            "2>/dev/null || sed -i 's|^URIs:.*|URIs: http://mirrors.aliyun.com/ubuntu/|' "
-            "/etc/apt/sources.list.d/ubuntu.sources 2>/dev/null; "
-            # 2) 装基础工具 (幂等: npm 存在即跳过). 用 if 显式检查 —
-            #    apt 失败必须让 setup 返回非 0 (之前的 `|| (...)` 会被
-            #    后面的 chown 掩盖退出码, 导致 npm 未装却继续走 MCP 预装)
-            "if ! command -v npm >/dev/null 2>&1; then "
-            "apt-get update -qq && DEBIAN_FRONTEND=noninteractive "
-            "apt-get install -y -qq -o DPkg::Lock::Timeout=600 "
-            "sudo git nodejs npm python3 python3-pip "
-            # hermes 安装依赖: curl (下载脚本) + xz-utils (tar 解压
-            # .tar.xz) + libatomic1 (Hermes 自带 Node 26 运行库)
-            "curl xz-utils libatomic1; fi; "
-            # 3) 员工用户 + sudo 组 (幂等)
+            # 1) 员工用户 + sudo 组 (幂等)
             f"id -u {shlex.quote(self.username)} >/dev/null 2>&1 || "
             f"useradd -m -s /bin/bash -u {self.uid} -G sudo "
             f"{shlex.quote(self.username)}; "
-            # 4) 免密 sudo (员工个人电脑, 提权不输密码)
+            # 2) 免密 sudo (员工个人电脑, 提权不输密码)
             f"[ -f /etc/sudoers.d/{shlex.quote(self.username)} ] || "
             f"echo '{self.username} ALL=(ALL) NOPASSWD:ALL' > "
             f"/etc/sudoers.d/{shlex.quote(self.username)}; "
-            # 5) 家目录属主 = 员工 (挂载目录默认 root 所有, 不 chown 写不进去)
+            # 3) 家目录属主 = 员工 (挂载目录默认 root 所有, 不 chown 写不进去)
             f"mkdir -p {shlex.quote(self.workdir)}; "
-            f"chown -R {self.uid}:{self.uid} {shlex.quote(self.workdir)}; "
-            # 6) 安装 Hermes Agent (幂等; 装到 /usr/local/bin 全局 PATH,
-            #    员工用户可直接用). install.sh 需下载 node 26 (nodejs.org)
-            #    + hermes 本体, 网络抖动时重试最多 3 次
-            "if ! command -v hermes >/dev/null 2>&1; then "
-            "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
-            "-o /tmp/hermes-install.sh 2>/dev/null && "
-            "for i in 1 2 3; do bash /tmp/hermes-install.sh >/dev/null 2>&1 "
-            "&& break || sleep 5; done; fi"
+            f"chown -R {self.uid}:{self.uid} {shlex.quote(self.workdir)}"
         )
-        r = self._pod("exec", self.container_name, "sh", "-c", setup,
-                      timeout=600)  # apt 首次安装包较多, 超时要给足
+        r = self._pod("exec", self.container_name, "sh", "-c", setup)
         if r.returncode != 0:
             raise RuntimeError(
-                f"podman exec 初始化系统失败 ({r.returncode}): "
+                f"podman exec 创建用户失败 ({r.returncode}): "
                 f"{(r.stderr or r.stdout or '').strip()[:300]}")
         # 企业云盘初始化 (容器内 root 建目录 + 权限/属主):
         #   - Public: 777 (公用共享), 属主 = CEO 的用户
@@ -887,9 +935,41 @@ _DRIVE_HOST = str((Path("./data/drive")).resolve())
 # 避免 40 个新容器各自 npm 网络下载 (data/ 整体 gitignored, 不入库)
 _NPM_CACHE_HOST = str((Path("./data/computers") / ".npm-cache").resolve())
 
-# 共享 apt 包缓存 (Ubuntu 容器换阿里源后装 sudo/git/node/python 时命中,
-# 首个容器下载 deb, 其余容器从缓存秒装)
-_APT_CACHE_HOST = str((Path("./data/computers") / ".apt-cache").resolve())
+
+# ── 基础镜像系统级初始化脚本 (基础容器内 root 执行一次, 然后 commit) ──
+# 内容 = 所有角色共用的系统层: 阿里源 / 员工电脑标配包 / Hermes Agent /
+# MCP filesystem 服务器. 任何一步失败 → 整体失败 (基础镜像必须完整).
+# 员工用户 (拼音 + uid) 不进基础镜像 — 每角色不同, 复制后各自添加.
+_BASE_INIT_SCRIPT = r"""
+set -e
+# 1) 镜像源 → 阿里云 (deb822 格式, 幂等)
+grep -q mirrors.aliyun.com /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null \
+  || sed -i 's|^URIs:.*|URIs: http://mirrors.aliyun.com/ubuntu/|' \
+       /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null
+# 2) 员工电脑标配包 (sudo/git/node/python + hermes 安装依赖)
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o DPkg::Lock::Timeout=600 \
+  sudo git nodejs npm python3 python3-pip curl xz-utils libatomic1
+# 3) Hermes Agent (装到 /usr/local/bin 全局, 员工用户可用).
+#    nodejs.org 下载 node 26 可能卡顿 (SSL 抖动时 install.sh 内部 curl
+#    无超时会挂死): curl 加超时 + timeout 包裹 install.sh (单次 400s),
+#    重试 2 次 — 避免基础镜像初始化被拖到 exec 超时 (1200s).
+if ! command -v hermes >/dev/null 2>&1; then
+  curl -fsSL --connect-timeout 20 --max-time 240 \
+    https://hermes-agent.nousresearch.com/install.sh \
+    -o /tmp/hermes-install.sh 2>/dev/null
+  for i in 1 2; do
+    timeout 400 bash /tmp/hermes-install.sh >/dev/null 2>&1 && break || sleep 3
+  done
+fi
+command -v hermes >/dev/null 2>&1 || { echo "Hermes 安装失败" >&2; exit 1; }
+# 4) MCP filesystem 服务器 (容器内全局 npm, 角色容器免装)
+npm ls -g --depth=0 2>/dev/null | grep -q 'server-filesystem' \
+  || npm install -g --no-fund --no-audit @modelcontextprotocol/server-filesystem
+# 5) 清理 apt 缓存, 缩小镜像体积
+apt-get clean && rm -rf /var/lib/apt/lists/*
+echo "BASE_INIT_OK"
+"""
 
 
 class ComputerManager:
@@ -932,6 +1012,58 @@ class ComputerManager:
                                capture_output=True, text=True, timeout=60)
                 logger.info("podman 自定义桥接网络已创建: %s", self.network_name)
         return self.network_name
+
+    def ensure_base_image(self) -> str:
+        """确保基础镜像存在 (maf-base:latest). 返回镜像名.
+
+        不存在时: 创建临时基础容器 → 系统级初始化 (阿里源/apt 包/hermes/
+        MCP 包, 约 10 分钟, 见 _BASE_INIT_SCRIPT) → podman commit 成镜像
+        → 删除临时容器. 之后角色容器从该镜像秒建, 只补员工用户.
+
+        并发保护: 模块级锁 + 双检 — 多角色并行装配时首个调用者完成
+        初始化, 其余等待后直接复用镜像 (不重复初始化).
+        """
+        if shutil.which("podman") is None:
+            return DEFAULT_IMAGE  # 降级环境无 podman, 无所谓镜像
+        with _BASE_IMAGE_LOCK:
+            r = subprocess.run(["podman", "image", "exists", BASE_IMAGE],
+                               capture_output=True, text=True, timeout=30)
+            if r.returncode == 0:
+                return BASE_IMAGE
+            # 清理可能的残留临时容器
+            subprocess.run(["podman", "rm", "-f", BASE_CONTAINER_NAME],
+                           capture_output=True, text=True, timeout=60)
+            r = subprocess.run(
+                ["podman", "run", "-d", "--name", BASE_CONTAINER_NAME,
+                 DEFAULT_IMAGE, "sleep", "infinity"],
+                capture_output=True, text=True, timeout=120)
+            if r.returncode != 0:
+                raise RuntimeError(
+                    f"创建基础容器失败 ({r.returncode}): "
+                    f"{(r.stderr or r.stdout or '').strip()[:300]}")
+            try:
+                # 系统级初始化 (apt 装包 + hermes 下载, 给足超时)
+                r = subprocess.run(
+                    ["podman", "exec", BASE_CONTAINER_NAME, "bash", "-c",
+                     _BASE_INIT_SCRIPT],
+                    capture_output=True, text=True, timeout=1200)
+                if r.returncode != 0 or "BASE_INIT_OK" not in (r.stdout or ""):
+                    raise RuntimeError(
+                        f"基础容器初始化失败 ({r.returncode}): "
+                        f"{(r.stderr or r.stdout or '').strip()[:300]}")
+                # commit 成基础镜像
+                r = subprocess.run(
+                    ["podman", "commit", BASE_CONTAINER_NAME, BASE_IMAGE],
+                    capture_output=True, text=True, timeout=300)
+                if r.returncode != 0:
+                    raise RuntimeError(
+                        f"基础镜像 commit 失败 ({r.returncode}): "
+                        f"{(r.stderr or r.stdout or '').strip()[:300]}")
+                logger.info("基础镜像 %s 已创建 (一次初始化, 角色容器从它复制)", BASE_IMAGE)
+            finally:
+                subprocess.run(["podman", "rm", "-f", BASE_CONTAINER_NAME],
+                               capture_output=True, text=True, timeout=60)
+            return BASE_IMAGE
 
     # ── 分配 / 注册 ───────────────────────────────────────
 
