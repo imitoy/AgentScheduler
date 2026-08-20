@@ -9,8 +9,12 @@
 用法:
     from src.python_tools.client_toolkit import create_client_toolkit
     ceo.add_toolkit(create_client_toolkit())
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_client_toolkit(): 创建甲方交流工具类.
+"""
 from __future__ import annotations
 
 import logging

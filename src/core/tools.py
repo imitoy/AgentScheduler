@@ -9,8 +9,28 @@ Supports:
   - MCP tools: compatible with mcp.types.Tool + stdio_client
   - Duplicate detection: warns when two toolkits register the same tool name
   - Role can add a full toolkit at once via AgentRole.add_toolkit()
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    ToolDef: (枚举/常量类)
+    ToolKit:
+        - add_python_tool(): Add a Python-native tool to this toolkit.
+        - tool_names(): 见方法源码
+        - tool_count(): 见方法源码
+        - get_tool(): 见方法源码
+    ToolRegistry:
+        - add_toolkit(): Import an entire toolkit. Returns number of new tools added.
+        - remove_toolkit(): Remove a toolkit and all its tools. Returns number of tools removed.
+        - add_tool(): Register a single Python tool.
+        - remove_tool(): 见方法源码
+        - list_tools(): Return all tools in LLM-compatible format.
+        - call_tool(): Execute a tool by name. Searches all loaded toolkits.
+        - to_openai_tools(): 生成 OpenAI 原生 function calling 格式的工具声明列表.
+        - tool_names(): 见方法源码
+        - toolkit_names(): 见方法源码
+        - tool_count(): 见方法源码
+"""
 from __future__ import annotations
 
 import logging

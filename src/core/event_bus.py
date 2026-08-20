@@ -9,8 +9,15 @@ EventBus 只承担"定时事件注册 / 取消 / 到期取出"的调度表职责
   TimeEventBus._dispatch → AgentSystem._on_time_event → EventDispatcher.trigger
   → role.evaluate_event (Layer 1 状态掩码 → Layer 2 显著性 → 转 Task 入队)。
 旧的 `process_event` 单 Agent 过滤管线与 AmbientBuffer 已删除。
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    EventBus:
+        - register_event(): 向调度表注册一个定时事件.
+        - cancel_event(): 取消一个已注册的定时事件 (仅调度表中的).
+        - list_scheduled_events(): 列出待触发的定时事件 (按触发 Tick 排序).
+"""
 from __future__ import annotations
 
 import logging

@@ -9,8 +9,13 @@
     from src.python_tools.hr_toolkit import create_hr_toolkit
     tk = create_hr_toolkit()
     hr_role.add_toolkit(tk)   # add_toolkit 自动绑定当前角色 (用于获取 RolePool)
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_hr_toolkit(): 创建人力资源工具类.
+    - bind_role_to_toolkit(): 将当前角色绑定到 hr 工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import json

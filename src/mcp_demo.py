@@ -1,19 +1,9 @@
 #!/usr/bin/env python3
-"""mcp_demo.py — 真实 MCP 文件工具演示 (官方 filesystem 服务器).
+"""MCP 演示脚本 (mcp_demo.py): 演示 MCP 服务器安装与工具调用.
 
-演示内容:
-  1. 用 MCPToolLoader 以 npx 启动官方 filesystem 服务器 (授权目录)
-  2. 按分组规则加载 file_ops 工具组 (read/write/edit/search 等)
-  3. 直接调用工具验证 (确定性): 读/写/编辑/查找/列目录
-  4. 将工具组注册到角色, 让 LLM 用文件工具完成任务
-
-授权目录: 默认项目根目录, 可用环境变量 MCP_FS_ALLOWED_DIR 覆盖.
-服务器:   npx -y @modelcontextprotocol/server-filesystem <授权目录>
-
-运行:
-    cd maf_scheduler && source .venv/bin/activate && python -m src.mcp_demo
-"""
-
+模块级函数:
+    - header() / ok() / info(): 终端 UI 打印辅助
+    - main(): 装配单个角色电脑 → 安装 MCP filesystem → 调用工具"""
 from __future__ import annotations
 
 import json

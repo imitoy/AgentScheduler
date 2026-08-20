@@ -6,8 +6,27 @@ Each template includes a person name (张三, 李四, etc.) and role_id (functio
 Usage:
     from src.core.role_templates import architect, fullstack_dev
     pool.add_role(architect())
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - architect(): 见函数源码
+    - fullstack_dev(): 见函数源码
+    - reviewer(): 见函数源码
+    - qa_engineer(): 见函数源码
+    - ops_engineer(): 见函数源码
+    - content_marketer(): 见函数源码
+    - data_analyst(): 见函数源码
+    - support_agent(): 见函数源码
+    - ceo(): CEO — 首席执行官 / 用户对齐官.
+    - coo(): COO — 首席运营官 / 任务调度与缺口识别官.
+    - hr(): HR — 首席人才官 / 招聘与面试官.
+    - cfo(): CFO — 首席财务官 / 预算与配额管控官.
+    - create_all_roles(): Create one instance of every role template.
+    - create_default_roles(): Create only the default management roles (CEO, COO, HR, CFO).
+    - get_template(): Get a role by template name. Raises KeyError if not found.
+    - add_template(): Register a new role template into the pool.
+"""
 from __future__ import annotations
 
 from typing import Callable

@@ -21,8 +21,26 @@ clone 后把 skills/ 目录复制到 data/skills/ (gitignored, 不入库).
     # 或编程式:
     mgr.search_skills("ppt")                  # 搜索
     mgr.add_skill(role, "pptx-generator")     # 给角色添加技能工具
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_skill_manager_toolkit(): 把技能管理操作打包成 LLM 可调用的工具类.
+    - bind_role_to_toolkit(): 将当前角色绑定到 skill_manager 工具类 (由 AgentRole.add_toolkit 内部调用).
+
+类与方法:
+    SkillInfo:
+        - tool_name(): 转成合法工具名 (小写下划线, 空格/连字符 → 下划线).
+        - read_skill_md(): 读取 SKILL.md 全文 (不存在返回空串).
+        - list_related_files(): 列出技能目录下的相关文件 (scripts/references/assets), 相对路径排序.
+    SkillManager:
+        - ensure_loaded(): 扫描技能库全部 SKILL.md 并解析 frontmatter. 幂等, 可重复调用.
+        - list_available(): 列出技能库中全部技能 (名称 + 简述 + 目录).
+        - search_skills(): 按关键词搜索技能 (匹配名称或描述).
+        - add_skill(): 为角色安装一个技能工具.
+        - remove_skill(): 从角色移除一个技能工具.
+        - list_role_skills(): 列出角色已添加的技能工具.
+"""
 from __future__ import annotations
 
 import logging

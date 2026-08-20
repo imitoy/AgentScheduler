@@ -5,8 +5,14 @@ Bridges EventBus → RolePool:
   2. Each role independently runs Layer 1-3 via AgentRole.evaluate_event()
   3. If PASS: converts event → Task, inserts into role's priority queue
   4. If BLOCKED/AMBIENT: logs reason, no task created for that role
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    EventDispatcher:
+        - trigger(): Fan out an event to roles.
+        - get_stats(): 见方法源码
+"""
 from __future__ import annotations
 
 import logging

@@ -10,8 +10,13 @@
 用法:
     from src.python_tools.time_toolkit import create_time_toolkit
     role.add_toolkit(create_time_toolkit())
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_time_toolkit(): 创建时间工具类.
+    - bind_time_to_toolkit(): 将 TimeEventBus 绑定到时间工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import logging

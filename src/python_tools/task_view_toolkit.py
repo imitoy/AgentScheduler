@@ -11,8 +11,13 @@ my_tasks 是系统/同事派发给角色的任务流 (只读视图).
 用法:
     from src.python_tools.task_view_toolkit import create_task_view_toolkit
     role.add_toolkit(create_task_view_toolkit())
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_task_view_toolkit(): 创建任务列表工具类.
+    - bind_role_to_toolkit(): 将角色绑定到任务列表工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import logging

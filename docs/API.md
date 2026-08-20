@@ -441,7 +441,7 @@ loader.close()
 
 ```python
 DeepSeekLLM(api_key=None, model=None)   # 默认从环境变量 DEEPSEEK_API_KEY / DEEPSEEK_MODEL
-OllamaLLM(model=None)                   # 本地 Ollama, 默认 gemma4:31b, 免 API Key
+OllamaLLM(model=None)                   # 本地 Ollama, 默认 gemma4-16k:latest, 免 API Key
 ```
 
 | 方法 | 参数 | 返回 |
@@ -451,7 +451,7 @@ OllamaLLM(model=None)                   # 本地 Ollama, 默认 gemma4:31b, 免 
 | `chat_with_tools(messages, tools)` | list, list | `(content, tool_calls, usage)` |
 
 环境变量: `DEEPSEEK_API_KEY`（必填）、`DEEPSEEK_MODEL`（默认 deepseek-v4-flash）、`DEEPSEEK_THINKING`（默认 true，思考模式）;
-`LLM_PROVIDER`（deepseek/ollama，切换后端）、`OLLAMA_BASE_URL`（默认 http://localhost:11434）、`OLLAMA_MODEL`（默认 gemma4:31b）。
+`LLM_PROVIDER`（deepseek/ollama，切换后端）、`OLLAMA_BASE_URL`（默认 http://localhost:11434）、`OLLAMA_MODEL`（默认 gemma4-16k:latest）。
 
 ---
 

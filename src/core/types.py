@@ -1,5 +1,12 @@
-"""Core data types for the Shift & Event-Driven Agent Scheduler."""
+"""Core data types for the Shift & Event-Driven Agent Scheduler.
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    AgentState: (枚举/常量类)
+    Priority: (枚举/常量类)
+    Event: (枚举/常量类)
+"""
 from __future__ import annotations
 
 import uuid

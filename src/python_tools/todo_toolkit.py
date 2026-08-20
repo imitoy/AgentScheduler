@@ -12,8 +12,13 @@
 用法:
     from src.python_tools.todo_toolkit import create_todo_toolkit
     role.add_toolkit(create_todo_toolkit())   # 自动绑定角色与存储
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_todo_toolkit(): 创建 Todo 清单工具类.
+    - bind_todo_to_toolkit(): 将 TodoStore 绑定到工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import logging

@@ -1,11 +1,11 @@
-"""角色中文名 → 汉语拼音 (系统用户名) 映射表.
+"""角色中文名 → 汉语拼音 (容器系统用户名) 映射表.
 
-Podman 容器用户名 = 员工名字的汉语拼音 (如 郭晓东 → guoxiaodong),
-用于企业云盘 (共享文件夹挂载 /mnt/drive/) 的权限管理:
-不同员工 = 不同容器内用户 = 不同 uid → 文件所有者可区分.
+规则: 全拼小写无空格, 姓名连写 (郭晓东 → guoxiaodong);
+与容器内 useradd 用户名一致, 用于企业云盘文件权限按员工区分.
 
-命名规则: 全拼小写无空格 (姓名连写), 与容器内 useradd 用户名一致.
-"""
+模块数据:
+    - NAME_PINYIN: dict[str, str] — 全部模板角色中文名 → 拼音
+    - to_pinyin(name, fallback): 查表, 未收录回退 fallback (ASCII 安全)"""
 
 from __future__ import annotations
 

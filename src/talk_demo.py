@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""talk_demo.py — Inter-role communication via 'talk' tool.
+"""通信演示脚本 (talk_demo.py): 演示多角色 talk 协作链.
 
-Demonstrates:
-  - Each role auto-registers a 'talk' MCP tool
-  - LLM can decide to call talk(target, message, urgency)
-  - Task flows between roles: coder → reviewer → architect
-  - Multi-role collaboration chain
+4 个角色协作链: CEO → 产品 → 开发 → 测试, 用 talk 工具跨角色沟通.
 
-Run:
-    cd maf_scheduler && source .venv/bin/activate && python -m src.talk_demo
-"""
-
+模块级函数:
+    - header(): 终端 UI 打印辅助
+    - main(): 装配 4 角色 → 依次派任务 → 观察 talk 消息流转"""
 from __future__ import annotations
 
 import logging

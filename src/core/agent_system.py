@@ -17,8 +17,24 @@
     status = system.get_status()       # 角色状态快照
     print(system.describe())           # 第 X 天, Tick Y
     system.stop()                      # 停止一切
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    AgentSystem:
+        - add_roles(): 批量注册角色: 耗时装配 (电脑创建 + MCP 服务器启动) 多线程并行.
+        - add_role(): 注册单个角色: 绑定共享 TimeEventBus + 自动注册工具类.
+        - add_default_roles(): 注册全部默认管理角色 (CEO/COO/HR/CFO). 返回角色列表.
+        - get_role(): 按 role_id 获取角色.
+        - get_status(): 获取所有角色状态快照.
+        - trigger(): 向事件总线投递事件, 广播给所有角色.
+        - assign_task(): 直接给指定角色分配任务.
+        - start(): 启动系统: 角色池线程 + 时间线程.
+        - stop(): 停止系统: 时间线程 + 角色池.
+        - tick(): 当前 Tick 数 (系统启动 = 0).
+        - day(): 当前第几天 (启动当天 = 1).
+        - describe(): 当前作息状态描述 (第几天 / Tick / 上班或下班).
+"""
 from __future__ import annotations
 
 import logging

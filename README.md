@@ -323,7 +323,7 @@ print(dev._tools.call_tool("lan_devices", {}))
 | DEEPSEEK_BASE_URL | https://api.deepseek.com | API 地址 |
 | LLM_PROVIDER | deepseek | LLM 后端: `deepseek` (云端) / `ollama` (本地) |
 | OLLAMA_BASE_URL | http://localhost:11434 | Ollama 服务地址 (OpenAI 兼容端点) |
-| OLLAMA_MODEL | gemma4:31b | 本地 Ollama 模型标签 |
+| OLLAMA_MODEL | gemma4-16k:latest | 本地 Ollama 模型标签 |
 
 ### 使用本地 Ollama 模型
 
@@ -333,7 +333,7 @@ print(dev._tools.call_tool("lan_devices", {}))
 
 ```bash
 export LLM_PROVIDER=ollama                     # 全局切换后端
-export OLLAMA_MODEL=gemma4:31b       # 默认即此, 可省略
+export OLLAMA_MODEL=gemma4-16k:latest       # 默认即此, 可省略
 ollama serve                                    # 确保本地服务在跑
 python src/role_demo.py                         # 示例: 多角色系统全走本地模型
 ```
@@ -373,3 +373,71 @@ store.save(system)          # 退出保存
 role.journal("任意活动记录")   # 写入该角色单独的文件
 pool.journal_all("全局通知")   # 每个角色的日志都写一条
 ```
+
+---
+
+## 模块结构 (各 py 文件说明)
+
+> 每个 `.py` 文件头部都有完整接口文档 (模块说明 + 类 + 方法清单)。
+
+### 核心层 `src/core/` — 角色 / 电脑 / 时间 / LLM / 持久化
+
+| 文件 | 模块说明 | 主要类 / 函数 |
+|---|---|---|
+| `roles.py` | 角色系统核心: AgentRole(单个角色: 任务队列/状态机/工具装配/talk/WAIT 同步等待/journal) + RolePool(线程池调度, 注册即建日志) | `AgentRole`, `RolePool`, `Task`, `Urgency`, `ToolLoopError` |
+| `computer.py` | 个人电脑抽象: LocalComputer(本地降级) / PodmanComputer(Ubuntu 容器, 拼音用户 + /mnt/drive 云盘挂载 + Hermes) / SSHComputer; ComputerManager 管理 + 基础镜像 `maf-base` 复制创建 | `Computer`, `LocalComputer`, `PodmanComputer`, `SSHComputer`, `ComputerManager`, `create_computer` |
+| `time_manager.py` | 作息时间引擎 + 事件总线: Tick/天/上下班事件, 定时任务, 全角色空闲才快进 Tick | `TimeEventBus`, `ScheduledTask` |
+| `event_bus.py` | 事件总线基类: 注册/取消/调度事件 | `EventBus` |
+| `dispatcher.py` | 事件分发器: 广播事件到所有角色 | `EventDispatcher` |
+| `llm.py` | LLM 后端抽象: OpenAICompatLLM 基类(chat/summarize/工具调用/重试) + DeepSeekLLM + OllamaLLM(本地模型) | `OpenAICompatLLM`, `DeepSeekLLM`, `OllamaLLM` |
+| `role_templates.py` | 54 个角色模板 (46 默认): CEO/COO/HR/CTO/技术负责人/前端后端移动全栈/测试/攻击者等 | `ceo`, `coo`, `frontend_dev`, `create_all_roles`, `get_template`, `TEMPLATES` |
+| `role_factory.py` | 角色工厂: 按模板创建角色 (指定 api_key/model/provider) | `RoleFactory` |
+| `agent_system.py` | 团队系统: 装配多角色 + 时间引擎 + 事件分发, 并行开机 | `AgentSystem` |
+| `tools.py` | 工具注册表: ToolDef(工具定义) / ToolKit(工具类) / ToolRegistry(统一注册/调用/OpenAI schema 导出) | `ToolDef`, `ToolKit`, `ToolRegistry` |
+| `types.py` | 公共类型: AgentState(角色状态机)/ Priority / Event | `AgentState`, `Priority`, `Event` |
+| `note_store.py` | 笔记 + 每日总结存储 (笔记带 remind_tick = 定时任务) | `NoteStore` |
+| `todo_store.py` | 个人 Todo 清单 (data/todos/<role_id>.json) | `TodoStore` |
+| `state_store.py` | 全量状态持久化 (data/state.json 原子写, 重启恢复) | `StateStore` |
+| `pinyin_map.py` | 角色中文名 → 汉语拼音映射 (容器用户名, 云盘权限) | `NAME_PINYIN`, `to_pinyin` |
+
+### 工具类层 `src/python_tools/` — LLM 可调用的工具 (ToolKit)
+
+| 文件 | 模块说明 | 工具 (LLM 调用名) |
+|---|---|---|
+| `__init__.py` | 工具类注册中心: DEFAULT_TOOLKITS 默认装配清单 + 各工厂导入 | `DEFAULT_TOOLKITS` |
+| `memory_toolkit.py` | 笔记/每日总结 | `write_note` `edit_note` `list_notes` `read_note` `summary` |
+| `time_toolkit.py` | 作息 | `get_time` `take_rest` |
+| `todo_toolkit.py` | 个人待办 | `todo_add` `todo_list` `todo_update` `todo_delete` |
+| `task_view_toolkit.py` | 任务列表视图 | `my_tasks` |
+| `hermes_toolkit.py` | 调用电脑上的 Hermes Agent (新建对话/发送对话, 同步等结果) | `hermes_new_conversation` `hermes_send` |
+| `computer_toolkit.py` | 电脑操作 | `run_command` `computer_status` `reboot` |
+| `mcp_manager.py` | MCP 工具自助管理 | `mcp_search` `mcp_list` `mcp_add` `mcp_remove` `mcp_my_tools` |
+| `mcp_toolkit.py` | MCP 客户端: 服务器连接/工具加载 (mcp-server-filesystem) | `MCPServer`, `MCPToolLoader` |
+| `skill_toolkit.py` | 技能库 (共享 data/skills) | `skill_search` `skill_add` `skill_list` 等 |
+| `talk_toolkit.py` | 角色通信 (人名寻址, wait 同步等待, 死锁检测) | `talk` `list_roles` |
+| `client_toolkit.py` | 与甲方交流 | `talk_to_client` |
+| `hr_toolkit.py` | 人事 (招聘) | `hire` 等 |
+
+### 入口与演示 `src/`
+
+| 文件 | 模块说明 |
+|---|---|
+| `main.py` | 系统主入口: 46 角色完整团队模拟 (恢复进度 → 循环跑日 → 保存状态) |
+| `role_demo.py` | 演示: 单角色创建 + 工具装配 + 任务执行 |
+| `talk_demo.py` | 演示: 4 角色 talk 协作链 |
+| `mcp_demo.py` | 演示: MCP filesystem 安装 + 工具调用 |
+
+### 测试 `tests/`
+
+| 文件 | 覆盖 |
+|---|---|
+| `test_event_bus.py` | 事件总线注册/触发/取消 |
+| `test_time_manager.py` | Tick 推进/作息事件/定时任务/快进 |
+| `test_journal.py` | 角色活动日志 |
+| `test_talk_wait.py` | talk 通信 / WAIT 同步等待 / 死锁环检测 / 附件 |
+| `test_state_store.py` | 状态持久化 保存/恢复 |
+| `test_llm_retry.py` | LLM 重试语义 (mock requests) |
+| `test_note_store.py` / `test_note_reminder.py` | 笔记存储 / 笔记提醒 = 定时任务 |
+| `test_todo_taskview.py` | Todo 清单 + 任务列表 |
+| `test_pinyin.py` | 拼音映射 / uid 分配 / 提示词含云盘与 Git 规范 |
+| `test_hermes_toolkit.py` | Hermes 对话工具 (建会话/发送/错误提示) |

@@ -11,8 +11,25 @@
     from src.python_tools.mcp_toolkit import load_mcp_toolkits
     toolkits = load_mcp_toolkits()          # {组名: ToolKit}
     role.add_toolkit(toolkits["file_ops"])
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - load_rules(): 加载 MCP 分组规则 JSON.
+    - load_mcp_toolkits(): 一键加载所有配置的 MCP 工具并分组.
+
+类与方法:
+    MCPServer:
+        - connect(): 启动后台线程, 用 npx 拉起服务器并建立会话.
+        - close(): 关闭服务器连接.
+        - is_alive(): 探测服务器会话是否仍然可用 (进程死亡/管道断裂后返回 False).
+        - list_tools(): 通过 SDK 的 ClientSession.list_tools() 获取服务器工具列表.
+        - call_tool(): 调用服务器上的工具. 返回结果文本.
+    MCPToolLoader:
+        - load(): 加载所有配置的 MCP 服务器工具并分组.
+        - list_loaded_tools(): 列出所有已加载工具及其来源服务器包名.
+        - close(): 关闭所有 MCP 服务器连接.
+"""
 from __future__ import annotations
 
 import asyncio

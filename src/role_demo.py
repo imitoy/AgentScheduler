@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-"""role_demo.py — 多角色并发任务调度演示.
+"""角色演示脚本 (role_demo.py): 演示单角色创建/工具装配/任务执行.
 
-Demonstrates:
-  - 3 roles (coder, reviewer, architect) with distinct personas
-  - Task priority queue (CRITICAL > HIGH > NORMAL > LOW)
-  - Concurrent execution via ThreadPoolExecutor
-  - Real DeepSeek LLM responses per role
-  - Urgency-based preemption simulation
-
-Run:
-    cd maf_scheduler && python -m src.role_demo
-"""
-
+模块级函数:
+    - header(): 终端 UI 打印辅助
+    - main(): 创建角色 → 挂工具 → 派任务 → 打印执行结果"""
 from __future__ import annotations
 
 import logging

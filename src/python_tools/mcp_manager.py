@@ -1,5 +1,4 @@
-"""
-MCP 工具管理类 (MCPManager) — 管理每角色电脑上的 MCP 服务器工具.
+"""MCP 工具管理类 (MCPManager) — 管理每角色电脑上的 MCP 服务器工具.
 
 架构 (C 方案, 2026-08): 每个角色的电脑 (podman 容器) 内运行独立的
 MCP filesystem 服务器, 授权目录 = 容器内 /home/agent. MCPManager 不维护
@@ -18,8 +17,21 @@ MCP filesystem 服务器, 授权目录 = 容器内 /home/agent. MCPManager 不�
     role.add_toolkit(tk)                      # add_toolkit 自动绑定当前角色
     # 或编程式:
     mgr.add_tool(role, "read_file")           # 给角色添加工具
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_mcp_manager_toolkit(): 把 MCP 管理操作打包成 LLM 可调用的工具类.
+    - bind_mcp_manager_to_toolkit(): 将当前角色绑定到 mcp_manager 工具类 (由 AgentRole.add_toolkit 内部调用).
+
+类与方法:
+    MCPManager:
+        - install_group_defaults(): 把指定组的 MCP 工具作为默认工具安装到角色 (从角色电脑的独立服务器).
+        - add_tool(): 为角色安装一个 MCP 工具 (来自该角色电脑的独立 MCP 服务器).
+        - remove_tool(): 从角色电脑卸载一个 MCP 工具.
+        - list_role_tools(): 列出角色电脑上已安装的 MCP 工具.
+        - role_toolkit(): 将角色已添加的 MCP 工具打包成一个 ToolKit (供提示词/汇总展示).
+"""
 from __future__ import annotations
 
 import logging

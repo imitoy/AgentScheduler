@@ -15,8 +15,13 @@ MCP 工具通过 mcp_manager 的 mcp_add 安装到电脑上, 经 computer.run_mc
 用法:
     from src.python_tools.computer_toolkit import create_computer_toolkit
     role.add_toolkit(create_computer_toolkit())   # add_toolkit 自动绑定当前角色
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_computer_toolkit(): 创建个人电脑工具类.
+    - bind_computer_to_toolkit(): 将当前角色绑定到 computer 工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import logging

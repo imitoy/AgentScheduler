@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""作息系统演示 — 真实时间流动 (TimeEventBus 自动走时).
+"""系统主入口: 启动完整的多角色 AI 团队模拟 (main.py).
 
-与之前"模拟时钟大步跳跃"不同, 本版本不注入模拟时钟:
-  - 1 Tick = 10 真实分钟, 系统启动 = Tick 0 / 第 1 天
-  - Tick 60 (10 小时后) 自动触发 SHIFT_END → 角色调 summary 下班
-  - 24 小时 (144 Tick) 后自动进入第 2 天 (SHIFT_START)
-  - 一天结束后自动进入第二天, 打印醒目横幅标题 (无需用户干预)
+职责:
+    1. 创建 AgentSystem, 装配 46 个默认工程角色 (含 CEO/COO/HR/CTO/负责人)
+    2. 从 StateStore 恢复上次进度 (角色/任务/时间/电脑绑定)
+    3. 启动时间引擎 + 角色线程池, 循环跑日 (上班 → 派任务 → 下班)
+    4. 每天结束时自动保存状态, 提供交互式运行控制
 
-流程:
-  第 1 天: CEO 注册 Tick 1 任务 (10 分钟后) 与用户沟通项目要求
-  第 2 天起: 不再安排甲方沟通, 重复日常循环
-
-运行:
-    cd maf_scheduler && source .venv/bin/activate && python -m src.main
-"""
-
+模块级函数:
+    - header() / step() / info() / ok() / warn(): 终端 UI 打印辅助
+    - wait_until(t, timeout): 等待所有角色空闲或超时
+    - run_one_day(system, day): 跑一天 (上班 → 等任务完成 → 下班)
+    - main(): 主流程 (恢复状态 → 循环天数 → 保存状态)"""
 from __future__ import annotations
 
 import logging

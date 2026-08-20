@@ -2,7 +2,7 @@
 
 两个后端都走 OpenAI 兼容的 chat/completions 接口 (OpenAI 格式):
   - DeepSeekLLM: DeepSeek V4 Flash, 可选 thinking (推理) 模式, 需 API Key.
-  - OllamaLLM:   本地 Ollama 服务, 默认 gemma4:31b, 免 API Key.
+  - OllamaLLM:   本地 Ollama 服务, 默认 gemma4-16k:latest, 免 API Key.
 
 公共接口 (与 MockLLM 同形):
   - chat(system, user) → (response_text, tokens_consumed)
@@ -10,8 +10,17 @@
   - chat_with_tools(messages, tools) → (content, raw_tool_calls, usage) 原生 function calling
 
 切换后端: 环境变量 LLM_PROVIDER=deepseek|ollama (见 roles.RolePool / role_factory.RoleFactory).
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    OpenAICompatLLM:
+        - chat(): 发送聊天请求. 返回(回复文本, Token数).
+        - summarize(): 从日志/文本生成简洁总结. 返回(总结文本, Token数).
+        - chat_with_tools(): 原生 function calling 请求 (OpenAI 兼容).
+    DeepSeekLLM: (枚举/常量类)
+    OllamaLLM: (枚举/常量类)
+"""
 from __future__ import annotations
 
 import logging
@@ -33,7 +42,7 @@ DEEPSEEK_THINKING = os.environ.get("DEEPSEEK_THINKING", "true").lower() in ("1",
 
 # 本地 Ollama (OpenAI 兼容端点, 免 API Key)
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4-16k:latest")
 
 DEFAULT_MAX_TOKENS = 512
 DEFAULT_TEMPERATURE = 0.7
@@ -459,7 +468,7 @@ class OllamaLLM(OpenAICompatLLM):
     """本地 Ollama 客户端 (OpenAI 兼容端点, 免 API Key).
 
     用法:
-        llm = OllamaLLM()   # 默认连接本地 http://localhost:11434 的 gemma4:31b
+        llm = OllamaLLM()   # 默认连接本地 http://localhost:11434 的 gemma4-16k:latest
         text, tokens = llm.chat(system="You are helpful.", user="Hello")
         content, raw_calls, usage = llm.chat_with_tools(messages, tools)
 
@@ -471,7 +480,7 @@ class OllamaLLM(OpenAICompatLLM):
     参数:
         api_key: 兼容参数, 一般留空 (传了也会作为 Bearer 头发送).
         base_url: Ollama 服务地址 (默认 OLLAMA_BASE_URL = http://localhost:11434).
-        model: 模型标签 (默认 OLLAMA_MODEL = gemma4:31b).
+        model: 模型标签 (默认 OLLAMA_MODEL = gemma4-16k:latest).
         label: 角色标识 (DEBUG 日志前缀).
     """
 
@@ -480,5 +489,5 @@ class OllamaLLM(OpenAICompatLLM):
     BASE_URL_ENV = "OLLAMA_BASE_URL"
     MODEL_ENV = "OLLAMA_MODEL"
     DEFAULT_BASE_URL = "http://localhost:11434"
-    DEFAULT_MODEL = "gemma4:31b"
+    DEFAULT_MODEL = "gemma4-16k:latest"
     REQUIRES_API_KEY = False

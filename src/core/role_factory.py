@@ -5,8 +5,13 @@ Usage:
     new_role = factory.create_role("需要一位精通 Rust 的后端工程师，熟悉 gRPC 和 PostgreSQL")
     pool.add_role(new_role)
     pool.start()
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    RoleFactory:
+        - create_role(): Create a new role from a hiring requirement description.
+"""
 from __future__ import annotations
 
 import json

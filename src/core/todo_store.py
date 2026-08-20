@@ -16,8 +16,16 @@
     store = TodoStore(role_id="tester_1")
     store.add("写周报", "本周工作小结")
     store.list(status="pending")
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    TodoStore:
+        - add(): 添加待办.
+        - list(): 列出待办 (按创建时间排序).
+        - update(): 更新待办状态.
+        - delete(): 删除待办. 返回是否删除成功.
+"""
 from __future__ import annotations
 
 import json

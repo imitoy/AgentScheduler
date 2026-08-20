@@ -10,8 +10,13 @@
     from src.python_tools.talk_toolkit import create_talk_toolkit
     tk = create_talk_toolkit(pool)       # pool = RolePool 实例
     role.add_toolkit(tk)                  # 角色导入整个工具类
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - build_team_roster(): 构建团队花名册 (固定格式, 供 talk 描述与 list_roles 工具复用).
+    - create_talk_toolkit(): 创建通信工具类 (talk + list_roles).
+"""
 from __future__ import annotations
 
 import logging

@@ -10,8 +10,21 @@
   - list_notes: 列出所有笔记标题
   - read_note:  读取笔记内容
   - save_summary / get_latest_summary: 每日总结 (作息系统用)
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    NoteStore:
+        - get_reminder(): 查询笔记的提醒信息 (未触发).
+        - write_note(): 写笔记. 已存在则覆盖.
+        - edit_note(): 编辑已有笔记 (覆盖内容). 不存在则创建.
+        - list_notes(): 列出所有笔记标题 (不含每日总结). 按文件名排序.
+        - read_note(): 读取笔记内容.
+        - delete_note(): 删除笔记 (真实删除文件 + 取消关联提醒). 返回是否删除成功.
+        - save_summary(): 保存某一天的总结.
+        - get_summary(): 读取指定天的总结.
+        - get_latest_summary(): 读取最近一次总结 (用于下一天冷启动).
+"""
 from __future__ import annotations
 
 import logging

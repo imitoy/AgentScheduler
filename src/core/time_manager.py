@@ -27,8 +27,35 @@ TimeEventBus 已并入 EventBus: TimeEventBus(EventBus) 既是时间源 (时钟/
     # 注册事件: 指定 Tick 触发 (到点由时间线程自动投递)
     bus.register_event(Event(...), tick=30)
     bus.stop()                                 # 停止线程
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    ScheduledTask:
+        - absolute_fire_tick(): 计算绝对触发 Tick: (day-1)*ticks_per_day + target_tick.
+    TimeEventBus:
+        - register_event(): 向事件总线注册一个事件 (TimeEventBus 版).
+        - set_event_sender(): 设置事件发送回调 (发送到事件分发器).
+        - set_idle_checker(): 设置"全部角色是否空闲"判定回调.
+        - set_fast_forward(): 开关快进功能.
+        - set_clock(): 设置时间源 (默认 datetime.now). 用于模拟测试.
+        - current_tick(): 获取当前 Tick 数 (自系统启动累计, 启动即为 0).
+        - day_number(): 获取当前是第几天 (系统启动当天为第 1 天).
+        - tick_of_day(): 获取今天内的 Tick 位置 (0 ~ ticks_per_day-1).
+        - tick_to_time(): 将 Tick 转换为相对时钟 "HH:MM" (从每天第 0 Tick 起算).
+        - is_working_hours(): 判断当前是否在上班时间内 (今日 Tick 在 [shift_start, shift_end) 之间).
+        - ticks_until_shift_end(): 距下班还有多少 Tick (已下班返回 0).
+        - get_shift_event(): 获取今日某个 Tick 位置对应的作息事件.
+        - describe(): 返回当前作息状态的文字描述 (供工具/提示词使用).
+        - start(): 启动时间线程 (独占线程, 周期性检查 Tick 并触发作息事件).
+        - set_progress(): 设置恢复进度: 下次 start() 时把 Tick 直接设为 (day, tick_of_day).
+        - stop(): 停止时间线程.
+        - is_running(): 见方法源码
+        - schedule_task(): 注册一个定时任务, 到达指定 Tick 时向事件总线发送提醒事件.
+        - list_tasks(): 列出未触发的定时任务.
+        - edit_task(): 编辑已有定时任务.
+        - cancel_task(): 删除定时任务 (同时取消已注册的事件).
+"""
 from __future__ import annotations
 
 import logging

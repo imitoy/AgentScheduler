@@ -13,8 +13,13 @@
 用法:
     from src.python_tools.memory_toolkit import create_memory_toolkit
     role.add_toolkit(create_memory_toolkit())
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_memory_toolkit(): 创建记忆工具类.
+    - bind_store_to_toolkit(): 将 NoteStore 绑定到工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import logging

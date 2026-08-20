@@ -15,8 +15,13 @@
 用法:
     from src.python_tools.hermes_toolkit import create_hermes_toolkit
     role.add_toolkit(create_hermes_toolkit())   # binder 自动绑定 role (提供电脑)
-"""
 
+接口文档 (模块结构与方法):
+
+模块级函数:
+    - create_hermes_toolkit(): 创建 Hermes 工具类.
+    - bind_hermes_to_toolkit(): 将角色绑定到 Hermes 工具类 (由 AgentRole.add_toolkit 内部调用).
+"""
 from __future__ import annotations
 
 import logging

@@ -15,8 +15,15 @@
     store.save(system)                 # 退出自动保存
 
 存储: JSON 原子写 (tmp + rename), data/ 整体 gitignored 不入库.
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    StateStore:
+        - exists(): 是否存在存档文件.
+        - save(): 保存系统全部状态到 JSON (原子写: tmp + rename).
+        - restore(): 从存档恢复系统状态 (角色档案/任务/容器/时间).
+"""
 from __future__ import annotations
 
 import json

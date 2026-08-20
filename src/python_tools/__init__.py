@@ -1,27 +1,24 @@
-"""Python 原生工具集.
+"""python_tools 工具类层包初始化.
 
-本文件夹存放所有 Python 实现的工具类 (ToolKit)。
-每个文件定义一个或多个工具类，角色通过 AgentRole.add_toolkit() 一次性导入。
+提供全部 LLM 可调用工具 (ToolKit 工厂 + 默认装配清单 DEFAULT_TOOLKITS):
 
-默认工具 (DEFAULT_TOOLKITS): 角色被添加进 AgentSystem 时自动加载,
-不需要额外配置。除 hr / client 之外的工具类均为默认:
-  - memory: summary / write_note / edit_note / list_notes / read_note
-  - time:   get_time / take_rest
-  - task:   create_task / list_tasks / edit_task / delete_task
-  - mcp_manager: mcp_search / mcp_list / mcp_add / mcp_remove / mcp_my_tools
-    (MCP 工具自助管理, 共享全局 MCPManager, 懒加载服务器)
-  - communication (talk / list_roles): 由 RolePool.start() 自动注入
-    (需要 pool 引用, 见 roles.py _register_talk_tool)
+DEFAULT_TOOLKITS (角色自动装配的工具类):
+    - memory: write_note/edit_note/list_notes/read_note/summary (笔记+每日总结)
+    - time:   get_time/take_rest (作息)
+    - todo:   todo_add/list/update/delete (个人待办)
+    - task_view: my_tasks (任务列表视图)
+    - hermes: hermes_new_conversation/hermes_send (电脑上的 Hermes Agent)
+    - computer: run_command/computer_status/reboot (电脑操作)
+    - mcp_manager: mcp_search/list/add/remove (MCP 工具管理)
+    - skill_manager: skill 相关 (技能库)
+    - talk: talk/list_roles (角色通信)
+    - client: talk_to_client (与甲方交流)
 
-需手动添加的工具类:
-  - hr:     post_job_posting / list_candidates (招聘即入职)
-  - client: talk_to_client (与甲方交流, 通常只给 CEO)
-
-用法:
-    from src.python_tools import DEFAULT_TOOLKITS
-    for factory in DEFAULT_TOOLKITS.values():
-        role.add_toolkit(factory())
-"""
+模块级函数 (每文件一个工具类, 详见各文件头部):
+    - create_memory_toolkit / create_time_toolkit / create_todo_toolkit /
+      create_task_view_toolkit / create_hermes_toolkit / create_computer_toolkit /
+      create_mcp_manager_toolkit / create_skill_manager_toolkit /
+      create_talk_toolkit / create_client_toolkit / create_hr_toolkit"""
 
 from typing import Callable
 

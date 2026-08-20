@@ -8,8 +8,47 @@ Each role has:
 
 RolePool manages all roles with a ThreadPoolExecutor, routing
 incoming events/tasks to appropriate roles.
-"""
 
+接口文档 (模块结构与方法):
+
+类与方法:
+    ToolLoopError: (枚举/常量类)
+    Urgency: (枚举/常量类)
+    Task: (枚举/常量类)
+    AgentRole:
+        - evaluate_event(): Run per-role 3-layer filter on an event.
+        - event_to_task(): Convert a passed Event into a Task for this role's queue.
+        - build_system_prompt(): 构建角色完整 System Prompt.
+        - add_task(): Add a task to this role's priority queue. Thread-safe.
+        - pop_task(): Pop the highest-urgency task. Returns None if queue is empty.
+        - peek_next_urgency(): Peek at the next task's urgency without removing.
+        - queue_depth(): 见方法源码
+        - current_task(): 见方法源码
+        - is_busy(): 见方法源码
+        - computer(): 获取该角色的个人电脑 (惰性创建, 角色添加时自动创建并开机).
+        - note_store(): 获取该角色的笔记存储实例 (惰性初始化, 按 role_id 隔离).
+        - get_latest_summary(): 读取该角色最近一次的每日总结 (用于下一天冷启动提示词).
+        - todo_store(): 获取该角色的 Todo 清单存储 (惰性初始化, data/todos/<role_id>.json).
+        - journal(): 写入角色活动日志 (data/journals/<role_id>.md), 便于查看角色活动信息.
+        - time_manager(): 获取该角色的作息时间管理器.
+        - bind_time_manager(): 绑定共享 TimeEventBus (所有角色共用同一个时间源).
+        - add_toolkit(): 导入整个工具类. 参数：toolkit=ToolKit实例. 返回新增工具数（跳过重复）.
+        - mcp_tool_names(): 见方法源码
+        - talk_to(): Programmatic inter-role communication (non-LLM path).
+    RolePool:
+        - add_role(): Register a role. Must be called before start().
+        - add_role_and_start(): 动态入职: 注册新角色并立即启动其 worker 线程 (招聘流程用).
+        - get_role(): 见方法源码
+        - get_role_by_name(): 按人名查找角色 (talk 工具用); 兼容按 role_id 回退.
+        - remove_role(): 离职: 移除角色并关闭其个人电脑.
+        - all_roles(): 返回所有角色列表 (按注册顺序).
+        - list_roles(): 见方法源码
+        - journal_all(): 全局通知: 给每个角色的活动日志都写一条 (查看团队活动信息).
+        - start(): Launch all role worker threads.
+        - shutdown(): Stop all role workers gracefully.
+        - assign_task(): Route a task to a specific role's queue.
+        - get_status(): Snapshot of all roles' status.
+"""
 from __future__ import annotations
 
 import heapq
