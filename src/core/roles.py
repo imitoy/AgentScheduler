@@ -758,9 +758,11 @@ class AgentRole:
                     "content": tool_result,
                 })
 
+            # 累计 token 上限可能为 None (已放开), 日志 %s 兼容显示 "不限"
+            token_cap = "不限" if MAX_TOOL_TOTAL_TOKENS is None else MAX_TOOL_TOTAL_TOKENS
             logger.debug("[%s] 工具循环: 第 %d 轮仍包含工具调用, 继续下一轮 "
-                         "(上限 %d 轮 / %d tokens)",
-                         self.role_id, round_no, MAX_TOOL_ROUNDS, MAX_TOOL_TOTAL_TOKENS)
+                         "(上限 %d 轮 / %s tokens)",
+                         self.role_id, round_no, MAX_TOOL_ROUNDS, token_cap)
 
 
 # ── RolePool ───────────────────────────────────────────────
