@@ -882,10 +882,11 @@ class RolePool:
         # 角色装配 (唯一入口, 与 AgentSystem.add_role 相同路径)
         self._setup_role(role)
 
-        # 与 start() 相同的单角色启动逻辑
+        # 与 start() 相同的单角色启动逻辑 (预注入 LLM 时不覆盖)
         role._running = True
         role._pool = self  # back-reference for talk tool
-        role._llm = self._new_llm(role.role_id)
+        if role._llm is None:
+            role._llm = self._new_llm(role.role_id)
         role._register_talk_tool()  # auto-register inter-role communication
         fut = self._executor.submit(self._role_loop, role)
         self._futures[role.role_id] = fut
@@ -971,7 +972,9 @@ class RolePool:
             self._setup_role(role)
             role._running = True
             role._pool = self  # back-reference for talk tool
-            role._llm = self._new_llm(role.role_id)
+            # 预注入 LLM (测试/脚本自定义后端) 时不覆盖
+            if role._llm is None:
+                role._llm = self._new_llm(role.role_id)
             role._register_talk_tool()  # auto-register inter-role communication
             fut = self._executor.submit(self._role_loop, role)
             self._futures[role_id] = fut
