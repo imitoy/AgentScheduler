@@ -40,7 +40,7 @@ import threading
 from pathlib import Path
 from typing import Any, Optional
 
-from src.core.tools import ToolDef, ToolKit
+from src.core.tools import ToolDef, ToolKit, make_mcp_handler
 
 logger = logging.getLogger(__name__)
 
@@ -318,17 +318,11 @@ class MCPToolLoader:
                 if server is None:
                     continue
 
-                def _make_handler(srv=server, tn=tname):
-                    def handler(args: dict[str, Any]) -> str:
-                        return srv.call_tool(tn, args)
-                    return handler
-
-                td = ToolDef(
+                td = ToolDef.from_mcp_tool(
                     name=tname,
-                    description=getattr(tool, "description", "") or "",
-                    input_schema=getattr(tool, "input_schema", {}) or {},
-                    handler=_make_handler(),
+                    tool=tool,
                     source=f"mcp:{server.package}",
+                    handler=make_mcp_handler(server, tname),
                     mcp_tool=tool,
                 )
                 toolkits[gname].add_tool(td)

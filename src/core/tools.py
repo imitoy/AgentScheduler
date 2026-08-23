@@ -80,6 +80,39 @@ class ToolDef:
     source: str = "python"                         # "python" | "mcp" | "talk"
     mcp_tool: Any = None                           # Original MCP Tool object if applicable
 
+    @classmethod
+    def from_mcp_tool(cls, name: str, tool: Any, source: str,
+                      handler: ToolHandler,
+                      mcp_tool: Any = None) -> "ToolDef":
+        """从 MCP 服务器返回的工具对象构建 ToolDef (三个装配点共用).
+
+        参数:
+            name:     工具名.
+            tool:     MCP 工具对象 (含 description / input_schema).
+            source:   来源标记 (如 "mcp:<package>").
+            handler:  调用闭包 (通常来自 make_mcp_handler).
+            mcp_tool: 原始 MCP 工具对象 (可选, 透传).
+        """
+        return cls(
+            name=name,
+            description=getattr(tool, "description", "") or "",
+            input_schema=getattr(tool, "input_schema", {}) or {},
+            handler=handler,
+            source=source,
+            mcp_tool=mcp_tool if mcp_tool is not None else tool,
+        )
+
+
+def make_mcp_handler(server: Any, tool_name: str) -> ToolHandler:
+    """构造 MCP 工具调用闭包: handler(args) → server.call_tool(tool_name, args).
+
+    三个 MCP 装配点共用 (computer 独立服务器 ×2 + mcp_toolkit 全局加载),
+    避免逐字重复的闭包样板.
+    """
+    def handler(args: dict[str, Any]) -> str:
+        return server.call_tool(tool_name, args)
+    return handler
+
 
 # ── ToolKit ───────────────────────────────────────────────
 

@@ -275,24 +275,18 @@ class Computer(ABC):
             )
             self._mcp_server.connect()
             tools = self._mcp_server.list_tools()
-            from src.core.tools import ToolDef
+            from src.core.tools import ToolDef, make_mcp_handler
             for tool in tools:
                 tname = getattr(tool, "name", "")
                 if not tname:
                     continue
                 server = self._mcp_server
 
-                def _make_handler(srv=server, tn=tname):
-                    def handler(args: dict[str, Any]) -> str:
-                        return srv.call_tool(tn, args)
-                    return handler
-
-                self._mcp_tools[tname] = ToolDef(
+                self._mcp_tools[tname] = ToolDef.from_mcp_tool(
                     name=tname,
-                    description=getattr(tool, "description", "") or "",
-                    input_schema=getattr(tool, "input_schema", {}) or {},
-                    handler=_make_handler(),
+                    tool=tool,
                     source=f"mcp:{server.package} (本电脑)",
+                    handler=make_mcp_handler(server, tname),
                 )
             logger.info("电脑[%s] 独立 MCP 服务器已安装, %d 个工具: %s",
                         self.role_id, len(self._mcp_tools),
@@ -564,24 +558,18 @@ class PodmanComputer(Computer):
             )
             self._mcp_server.connect()
             tools = self._mcp_server.list_tools()
-            from src.core.tools import ToolDef
+            from src.core.tools import ToolDef, make_mcp_handler
             for tool in tools:
                 tname = getattr(tool, "name", "")
                 if not tname:
                     continue
                 server = self._mcp_server
 
-                def _make_handler(srv=server, tn=tname):
-                    def handler(args: dict[str, Any]) -> str:
-                        return srv.call_tool(tn, args)
-                    return handler
-
-                self._mcp_tools[tname] = ToolDef(
+                self._mcp_tools[tname] = ToolDef.from_mcp_tool(
                     name=tname,
-                    description=getattr(tool, "description", "") or "",
-                    input_schema=getattr(tool, "input_schema", {}) or {},
-                    handler=_make_handler(),
+                    tool=tool,
                     source=f"mcp:{MCP_FILESYSTEM_PACKAGE} (容器内 {self.container_name})",
+                    handler=make_mcp_handler(server, tname),
                 )
             logger.info("电脑[%s] 容器内 MCP 服务器已安装, %d 个工具: %s",
                         self.role_id, len(self._mcp_tools),
