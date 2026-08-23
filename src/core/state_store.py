@@ -150,25 +150,9 @@ class StateStore:
             "computer_kind": role.computer_kind,
             "computer_kwargs": dict(role.computer_kwargs),
             # 队列中未完成任务 (重启后继续处理)
-            "pending_tasks": [StateStore._task_to_dict(t) for t in role.pending_tasks()],
+            "pending_tasks": [t.to_dict() for t in role.pending_tasks()],
             # 已完成/失败任务历史 (对话/工作记录)
-            "history": [StateStore._task_to_dict(t) for t in role.task_history()],
-        }
-
-    @staticmethod
-    def _task_to_dict(t: Any) -> dict[str, Any]:
-        """Task → dict (urgency 存正数, 加载时 __post_init__ 转负)."""
-        return {
-            "urgency": abs(int(t.urgency)),
-            "task_id": t.task_id,
-            "description": t.description,
-            "source": t.source,
-            "context": dict(t.context),
-            "status": t.status,
-            "result": t.result,
-            "tokens_consumed": t.tokens_consumed,
-            "created_at": t.created_at,
-            "assigned_role": t.assigned_role,
+            "history": [t.to_dict() for t in role.task_history()],
         }
 
     # ── 应用 (dict → 内存) ───────────────────────────────
@@ -188,10 +172,10 @@ class StateStore:
             restored += 1
             # 队列中未完成任务 (add_task 会写日志, 正常留痕)
             for t in rdata.get("pending_tasks", []):
-                role.add_task(Task(**self._task_from_dict(t)))
+                role.add_task(Task.from_dict(t))
             # 历史
             role.restore_task_history([
-                Task(**self._task_from_dict(t)) for t in rdata.get("history", [])
+                Task.from_dict(t) for t in rdata.get("history", [])
             ])
 
         # 2) 电脑/容器: 重建对象并绑定已存在的容器 (不重建容器)
@@ -280,19 +264,3 @@ class StateStore:
                     logger.info("StateStore: 电脑已恢复绑定 → %s", rid)
                 except Exception:
                     logger.exception("StateStore: 电脑恢复失败 → %s", rid)
-
-    @staticmethod
-    def _task_from_dict(d: dict[str, Any]) -> dict[str, Any]:
-        """dict → Task 构造参数."""
-        return {
-            "urgency": int(d.get("urgency", 3)),
-            "task_id": d.get("task_id", ""),
-            "description": d.get("description", ""),
-            "source": d.get("source", ""),
-            "context": dict(d.get("context", {})),
-            "status": d.get("status", "pending"),
-            "result": d.get("result", ""),
-            "tokens_consumed": int(d.get("tokens_consumed", 0)),
-            "created_at": float(d.get("created_at", time_module.time())),
-            "assigned_role": d.get("assigned_role", ""),
-        }

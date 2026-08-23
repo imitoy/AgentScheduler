@@ -104,6 +104,10 @@ from typing import Any, Iterator, Optional
 
 logger = logging.getLogger(__name__)
 
+# ── 路径常量 (使用处统一引用, 不散落字面量) ──────────────
+COMPUTERS_ROOT = "./data/computers"   # 角色个人电脑工作目录根
+DRIVE_ROOT = "./data/drive"           # 企业云盘共享目录 (挂载 /mnt/drive)
+
 # 默认 podman 镜像 (ubuntu:24.04: 员工电脑基础, AI 熟悉 Debian 系).
 # 角色容器不从它直接创建, 而是从基础镜像 maf-base 复制 (见 BASE_IMAGE).
 DEFAULT_IMAGE = "ubuntu:24.04"
@@ -379,8 +383,8 @@ class LocalComputer(Computer):
     工作目录: data/computers/<role_id>/, 命令用 subprocess 在本地执行.
     """
 
-    def __init__(self, role_id: str, base_dir: str = "./data/computers",
-                 auto_mcp: bool = False, drive_dir: str = "./data/drive",
+    def __init__(self, role_id: str, base_dir: str = COMPUTERS_ROOT,
+                 auto_mcp: bool = False, drive_dir: str = DRIVE_ROOT,
                  name: str = "", username: str = "", uid: int = 0):
         super().__init__(role_id, auto_mcp=auto_mcp)
         self.name = name          # 角色中文名 (Manager.create 透传)
@@ -945,7 +949,8 @@ DEFAULT_NETWORK_NAME = "maf-net"  # podman 自定义桥接网络 (电脑间互�
 # 企业云盘共享目录 (所有角色容器挂载同一份到 /mnt/drive):
 #   Public/   = 公用共享 (777, 属主 CEO 的用户)
 #   <名字>/   = 各员工个人目录 (755, 属主 = 对应员工)
-_DRIVE_HOST = str((Path("./data/drive")).resolve())
+# DRIVE_ROOT / COMPUTERS_ROOT 定义在文件前部 (LocalComputer 默认参数引用)
+_DRIVE_HOST = str((Path(DRIVE_ROOT)).resolve())
 
 # 共享 npm 全局缓存目录 (挂载进每个角色容器): 容器预装 MCP 包时命中缓存,
 # 避免 40 个新容器各自 npm 网络下载 (data/ 整体 gitignored, 不入库)

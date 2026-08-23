@@ -32,6 +32,8 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
+from src.core.types import is_failure_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,7 +84,14 @@ class NoteStore:
         return str(self._dir / f"{self._sanitize_title(title)}.md")
 
     def _summary_path(self, day: int) -> str:
-        return str(self._dir / f"_summary_day_{day}.md")
+        return str(self._dir / self.summary_filename(day))
+
+    @staticmethod
+    def summary_filename(day: int) -> str:
+        """每日总结文件名 (唯一实现, main.py 等消费方统一引用)."""
+        return f"{NoteStore.SUMMARY_PREFIX}{day}.md"
+
+    SUMMARY_PREFIX = "_summary_day_"  # 总结文件前缀 (get_latest_summary 解析用)
 
     # ── 底层读写 (走电脑或本地) ──────────────────────────
 
@@ -91,8 +100,7 @@ class NoteStore:
             result = self._computer.write_file(path, content)
             # Medium-6 修复: 电脑写入失败 (电脑未开机/命令失败) 必须显式抛出,
             # 否则上层会向 LLM 谎报"已保存"而数据实际没落盘
-            if isinstance(result, str) and (result.startswith("错误:")
-                                            or result.startswith("[exit ")):
+            if isinstance(result, str) and is_failure_text(result):
                 raise IOError(f"电脑写入失败: {result}")
         else:
             p = Path(path)
@@ -102,7 +110,7 @@ class NoteStore:
     def _read(self, path: str) -> Optional[str]:
         if self._computer is not None:
             r = self._computer.read_file(path)
-            if r.startswith("文件不存在") or r.startswith("错误:"):
+            if is_failure_text(r):
                 return None
             return r
         p = Path(path)
@@ -275,7 +283,7 @@ class NoteStore:
             return False
         if self._computer is not None:
             result = self._computer.delete_file(path)
-            if isinstance(result, str) and result.startswith("错误:"):
+            if isinstance(result, str) and is_failure_text(result):
                 logger.warning("[%s] 删除笔记失败: %s", self.role_id, result)
                 return False
         else:

@@ -30,6 +30,7 @@ import shlex
 from typing import Any
 
 from src.core.tools import ToolKit
+from src.core.types import is_failure_text
 
 logger = logging.getLogger(__name__)
 

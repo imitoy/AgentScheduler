@@ -23,7 +23,7 @@ import logging
 from typing import Any
 
 from src.core.tools import ToolKit
-from src.core.types import AgentState
+from src.core.types import AgentState, is_failure_text
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,7 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
                 content = comp.read_file(f"{comp.drive_root}/{attachment}")
             except Exception as exc:
                 return f"错误: 附件不可读: {exc}"
-            if content.startswith(("[exit", "错误", "文件不存在")):
+            if is_failure_text(content):
                 return f"错误: 附件无效: 云盘文件不存在或不可读 '{attachment}'"
 
         # ── 1) 回复投递: 目标正处于 WAIT 且在等我回复 → 直接投递唤醒 ──

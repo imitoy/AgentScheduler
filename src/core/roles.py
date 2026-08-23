@@ -129,6 +129,40 @@ class Task:
         # i.e. CRITICAL(10) → -10 is popped before HIGH(6) → -6
         self.urgency = -int(self.urgency) if self.urgency > 0 else self.urgency
 
+    def to_dict(self) -> dict[str, Any]:
+        """Task → 可序列化 dict (urgency 存正数, from_dict 恢复时转负).
+
+        序列化协议唯一实现 — 存档/展示共用, 避免多处镜像维护.
+        """
+        return {
+            "urgency": abs(int(self.urgency)),
+            "task_id": self.task_id,
+            "description": self.description,
+            "source": self.source,
+            "context": dict(self.context),
+            "status": self.status,
+            "result": self.result,
+            "tokens_consumed": self.tokens_consumed,
+            "created_at": self.created_at,
+            "assigned_role": self.assigned_role,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "Task":
+        """dict → Task (__post_init__ 会把正数 urgency 转负)."""
+        return cls(
+            urgency=int(d.get("urgency", 3)),
+            task_id=d.get("task_id", ""),
+            description=d.get("description", ""),
+            source=d.get("source", ""),
+            context=dict(d.get("context", {})),
+            status=d.get("status", "pending"),
+            result=d.get("result", ""),
+            tokens_consumed=int(d.get("tokens_consumed", 0)),
+            created_at=float(d.get("created_at", time.time())),
+            assigned_role=d.get("assigned_role", ""),
+        )
+
 
 # ── AgentRole ──────────────────────────────────────────────
 
@@ -958,16 +992,28 @@ class RolePool:
         # 角色装配 (唯一入口, 与 AgentSystem.add_role 相同路径)
         self._setup_role(role)
 
-        # 与 start() 相同的单角色启动逻辑 (预注入 LLM 时不覆盖)
+        # 与 start() 相同的单角色启动逻辑
+        self._start_one_role(role)
+        # 行为对齐: 新入职也写"角色就位"日志 (原实现缺失, 动态入职
+        # 的角色没有就位记录; add_role 注册路径在 901 行已写)
+        role.journal(f"角色就位: {role.name} — {role.title or role.role_id}")
+        return role
+
+    def _start_one_role(self, role: AgentRole) -> None:
+        """启动单个角色 worker (start / add_role_and_start 共用).
+
+        标记运行 → 回填池引用 → 创建 LLM → 注册 talk 工具 → 提交线程.
+        装配 (_setup_role) 须在调用前完成.
+        """
         role._running = True
         role._pool = self  # back-reference for talk tool
+        # 预注入 LLM (测试/脚本自定义后端) 时不覆盖
         if role._llm is None:
             role._llm = self._new_llm(role.role_id)
         role._register_talk_tool()  # auto-register inter-role communication
         fut = self._executor.submit(self._role_loop, role)
         self._futures[role.role_id] = fut
-        logger.info("Role '%s' (新入职) worker started", role.role_id)
-        return role
+        logger.info("Role '%s' worker started", role.role_id)
 
     def get_role(self, name: str) -> AgentRole:
         if name not in self._roles:
@@ -1046,15 +1092,7 @@ class RolePool:
         for role_id, role in self._roles.items():
             # 角色装配 (唯一入口; 幂等 — AgentSystem.add_role 已装配的会跳过)
             self._setup_role(role)
-            role._running = True
-            role._pool = self  # back-reference for talk tool
-            # 预注入 LLM (测试/脚本自定义后端) 时不覆盖
-            if role._llm is None:
-                role._llm = self._new_llm(role.role_id)
-            role._register_talk_tool()  # auto-register inter-role communication
-            fut = self._executor.submit(self._role_loop, role)
-            self._futures[role_id] = fut
-            logger.info("Role '%s' worker started", role_id)
+            self._start_one_role(role)
 
     def shutdown(self, wait: bool = True) -> None:
         """Stop all role workers gracefully."""
