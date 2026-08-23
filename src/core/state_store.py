@@ -108,17 +108,17 @@ class StateStore:
         for role in pool.all_roles():
             roles_data.append(self._role_to_dict(role))
 
-        # 电脑/容器信息: 已创建电脑的角色 (role._computer 非 None)
+        # 电脑/容器信息: 已创建电脑的角色 (computer_if_created 非 None)
         computers: dict[str, dict[str, Any]] = {}
         from src.core.computer import _COMPUTER_MANAGER
         for role in pool.all_roles():
-            comp = getattr(role, "_computer", None)
+            comp = role.computer_if_created
             if comp is None:
                 continue
             computers[role.role_id] = {
                 "kind": type(comp).__name__.replace("Computer", "").lower(),
-                "auto_mcp": bool(getattr(comp, "_auto_mcp", False)),
-                "name": _COMPUTER_MANAGER._names.get(role.role_id, role.name),
+                "auto_mcp": bool(comp.auto_mcp),
+                "name": _COMPUTER_MANAGER.name_of(role.role_id, role.name),
             }
 
         return {
@@ -150,9 +150,9 @@ class StateStore:
             "computer_kind": role.computer_kind,
             "computer_kwargs": dict(role.computer_kwargs),
             # 队列中未完成任务 (重启后继续处理)
-            "pending_tasks": [StateStore._task_to_dict(t) for t in role._queue],
+            "pending_tasks": [StateStore._task_to_dict(t) for t in role.pending_tasks()],
             # 已完成/失败任务历史 (对话/工作记录)
-            "history": [StateStore._task_to_dict(t) for t in role._task_history],
+            "history": [StateStore._task_to_dict(t) for t in role.task_history()],
         }
 
     @staticmethod
@@ -190,9 +190,9 @@ class StateStore:
             for t in rdata.get("pending_tasks", []):
                 role.add_task(Task(**self._task_from_dict(t)))
             # 历史
-            role._task_history = [
+            role.restore_task_history([
                 Task(**self._task_from_dict(t)) for t in rdata.get("history", [])
-            ]
+            ])
 
         # 2) 电脑/容器: 重建对象并绑定已存在的容器 (不重建容器)
         self._restore_computers(system, data.get("computers", {}))
@@ -252,7 +252,7 @@ class StateStore:
 
         roles = {r.role_id: r for r in system.pool.all_roles()}
         todo = {rid: c for rid, c in computers.items() if rid in roles
-                and getattr(roles[rid], "_computer", None) is None}
+                and roles[rid].computer_if_created is None}
         if not todo:
             return
 
@@ -267,7 +267,7 @@ class StateStore:
                 name=cdata.get("name", role.name),
                 auto_mcp=bool(cdata.get("auto_mcp", True)),
             )
-            role._computer = comp
+            role.bind_computer(comp)
             comp.power_on()  # 容器已存在 → 幂等启动 + MCP 重连
 
         with ThreadPoolExecutor(max_workers=min(10, len(todo)),

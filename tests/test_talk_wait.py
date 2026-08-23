@@ -29,6 +29,7 @@ def _setup_roles(tmp_path, monkeypatch, *role_ids):
     for rid in role_ids:
         role = AgentRole(name=f"角色{rid}", role_id=rid)
         pool.add_role(role)
+        role._pool = pool  # 模拟 start() 后的 back-reference (talk_wait 解析目标用)
         tk = create_talk_toolkit(pool)
         tk._role_holder = {"role": role}  # type: ignore[attr-defined]
         toolkits[rid] = tk
@@ -125,6 +126,8 @@ def test_wait_roundtrip_with_real_names(tmp_path, monkeypatch):
     b = AgentRole(name="郭晓东", role_id="tester_1")
     pool.add_role(a)
     pool.add_role(b)
+    a._pool = pool  # 模拟 start() 后的 back-reference
+    b._pool = pool
     tks = {}
     for r in (a, b):
         tk = create_talk_toolkit(pool)

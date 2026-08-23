@@ -175,8 +175,9 @@ class AgentSystem:
                     logger.info("AgentSystem: SHIFT_START → %s 上班 (ON_DUTY_IDLE)", role.role_id)
                 # 上班自动开机 (下班后 summary 已自动关机)
                 try:
-                    if role._computer is not None and not role._computer.is_on:
-                        role._computer.power_on()
+                    if role.computer_if_created is not None \
+                            and not role.computer_if_created.is_on:
+                        role.computer_if_created.power_on()
                         logger.info("AgentSystem: SHIFT_START → %s 电脑已自动开机",
                                     role.role_id)
                 except Exception:

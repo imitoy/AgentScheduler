@@ -61,15 +61,15 @@ def create_task_view_toolkit() -> ToolKit:
         role = _get_role()
         scope = (args.get("scope") or "all").strip().lower()
 
-        # 1) 待处理队列 (role._queue 是 Task 列表)
-        queue = list(role._queue)
+        # 1) 待处理队列 (加锁快照, 公开访问器)
+        queue = role.pending_tasks()
         pending_lines = []
         for t in queue:
             pending_lines.append(
                 f"- [id={t.task_id}] 紧急度={abs(t.urgency)} | {t.description[:120]}")
 
         # 2) 历史 (最近 HISTORY_LIMIT 条)
-        history = list(role._task_history[-HISTORY_LIMIT:])
+        history = role.task_history(HISTORY_LIMIT)
         hist_lines = []
         for t in reversed(history):
             mark = "✅" if t.status == "done" else "❌"

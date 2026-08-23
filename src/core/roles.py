@@ -650,6 +650,89 @@ class AgentRole:
             self._reply_box = content
             self._reply_cond.notify_all()
 
+    # ── 公开访问器 (供工具层/存档层使用, 不直接触碰私有字段) ──
+
+    @property
+    def computer_if_created(self) -> Optional[Any]:
+        """只读获取个人电脑 (未创建返回 None, 不惰性创建).
+
+        与 computer property 不同: 后者首次访问会惰性创建并开机
+        (build_system_prompt → note_store → computer 链路会触发),
+        这里只读判断是否已有电脑, 用于存档/关机等不想要副作用的地方.
+        """
+        return self._computer
+
+    @property
+    def waiting_reply_from(self) -> Optional[str]:
+        """只读等待链: 该角色正在等待谁的 talk 回复 (role_id, None = 未等待)."""
+        return self._waiting_reply_from
+
+    @property
+    def pool(self) -> Optional[Any]:
+        """只读所在角色池 (RolePool, start 时回填; 未启动为 None)."""
+        return self._pool
+
+    def pending_tasks(self) -> list[Task]:
+        """待处理队列的加锁快照 (与 add/pop 同一把锁, 避免并发读不一致)."""
+        with self._lock:
+            return list(self._queue)
+
+    def task_history(self, limit: Optional[int] = None) -> list[Task]:
+        """最近任务历史快照.
+
+        参数:
+            limit: 最多返回条数 (截取最近 N 条, None = 全部).
+        """
+        if limit is None:
+            return list(self._task_history)
+        return list(self._task_history[-limit:])
+
+    def restore_task_history(self, tasks: list[Task]) -> None:
+        """整体替换任务历史 (StateStore 恢复用, 避免直接写私有字段)."""
+        self._task_history = list(tasks)
+
+    def bind_computer(self, comp: Any) -> None:
+        """绑定个人电脑对象 (StateStore 恢复容器绑定时用)."""
+        self._computer = comp
+
+    def talk_wait(self, target_id: str, task: Optional[Task] = None,
+                  timeout: Optional[float] = None) -> Optional[str]:
+        """公开 WAIT 协议: 阻塞等待目标角色的 talk 回复.
+
+        串起 begin → (可选投递任务) → wait → end 四个内部步骤 (单次调用
+        完整执行, 防止跨模块拼接私有方法). 目标回复经 deliver_reply 唤醒.
+
+        注意: 先进入 WAIT 再投递任务 — 若先投递, 对方秒回时回复会落在
+        begin_wait 的信箱清空之前, 导致回复丢失 (竞态).
+
+        参数:
+            target_id: 等待其回复的 role_id.
+            task:      可选 — 投递给目标的任务 (talk 消息), 在进入 WAIT 后入队.
+            timeout:   最长等待秒数 (None = 无限等待).
+
+        返回:
+            回复内容, 超时未收到返回 None.
+        """
+        self._begin_wait(target_id)
+        try:
+            if task is not None:
+                # 任务投递给目标角色 (经所在池解析 target_id, 不能加到
+                # 自己的队列 — 发送者此时处于 WAIT, 不该处理新任务)
+                target = None
+                if self._pool is not None:
+                    target = self._pool.get_role(target_id)
+                if target is None:
+                    raise ValueError(
+                        f"talk_wait: 目标角色 {target_id} 不在角色池中, 无法投递任务")
+                target.add_task(task)
+            return self._wait_for_reply(timeout)
+        finally:
+            self._end_wait()
+
+    def deliver_reply(self, content: str) -> None:
+        """投递 talk 回复给处于 WAIT 的等待者 (公开版 _deliver_reply)."""
+        self._deliver_reply(content)
+
     # ── Tool-calling LLM execution ─────────────────────────
 
     def _execute_with_tools(self, task: Task) -> tuple[str, int]:

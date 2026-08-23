@@ -69,11 +69,11 @@ def _would_deadlock(pool: Any, start_role: Any, sender_id: str) -> bool:
     """
     seen = set()
     cur = start_role
-    while cur is not None and cur.state == AgentState.WAIT and cur._waiting_reply_from:
+    while cur is not None and cur.state == AgentState.WAIT and cur.waiting_reply_from:
         if cur.role_id in seen:
             return True  # 等待链自身成环 (理论不可达, 防御)
         seen.add(cur.role_id)
-        nxt_id = cur._waiting_reply_from
+        nxt_id = cur.waiting_reply_from
         if nxt_id == sender_id:
             return True  # 等待链绕回发送者 → 互等死锁
         cur = pool._roles.get(nxt_id)
@@ -161,8 +161,8 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
         #    等待者 worker 阻塞中, 回复绝不能入队 (否则永远收不到);
         #    wait 参数在此被忽略 — 回复本身不进入等待, 从根上拆解双向互等.
         if target_role.state == AgentState.WAIT \
-                and target_role._waiting_reply_from == sender_id:
-            target_role._deliver_reply(message)
+                and target_role.waiting_reply_from == sender_id:
+            target_role.deliver_reply(message)
             if sender is not None:
                 sender.journal(
                     f"回复了等待中的 {target_role.name}: {message[:80]}")
@@ -203,15 +203,10 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
                         "请勿使用 wait=true, 改为普通消息或稍后再询问。")
             # 先进入 WAIT 再发消息: 防止对方秒回时回复投递条件不成立 (竞态)
             # 等待链统一用 role_id 判断 (LLM 参数用人名, 程序内部用 role_id)
-            sender._begin_wait(target_role.role_id)
-            try:
-                target_role.add_task(task)
-                sender.journal(
-                    f"发消息给 {target_role.name} ({urgency.name}, 等待回复): "
-                    f"{message[:80]}")
-                reply = sender._wait_for_reply()  # 无限等待回复
-            finally:
-                sender._end_wait()
+            sender.journal(
+                f"发消息给 {target_role.name} ({urgency.name}, 等待回复): "
+                f"{message[:80]}")
+            reply = sender.talk_wait(target_role.role_id, task=task)  # 无限等待
             return f"已收到 {target_role.name} 的回复: {reply}"
 
         # ── 3) 普通消息: 入目标队列, 立即返回 ──

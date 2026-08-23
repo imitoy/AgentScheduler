@@ -89,8 +89,9 @@ def create_memory_toolkit() -> ToolKit:
                 logger.info("[%s] 总结完成, 角色已切换为 OFF_DUTY", role.role_id)
             # 一天结束: 自动关闭个人电脑 (下次上班/事件自动开机)
             try:
-                if role._computer is not None and role._computer.is_on:
-                    role._computer.power_off()
+                comp = role.computer_if_created
+                if comp is not None and comp.is_on:
+                    comp.power_off()
                     logger.info("[%s] 一天结束, 电脑已自动关机", role.role_id)
             except Exception:
                 logger.warning("[%s] 电脑自动关机失败", role.role_id, exc_info=True)

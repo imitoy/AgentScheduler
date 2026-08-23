@@ -48,7 +48,7 @@ def create_hr_toolkit(api_key: str | None = None) -> ToolKit:
 
     def _pool() -> Any:
         """获取角色所属 RolePool (可能未启动)."""
-        return getattr(_role(), "_pool", None)
+        return _role().pool
 
     def _post_job_posting(args: dict[str, Any]) -> str:
         """发布招聘启事: 招聘新角色并立即入职.

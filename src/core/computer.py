@@ -189,8 +189,28 @@ class Computer(ABC):
         """关机. 返回状态说明."""
 
     @abstractmethod
-    def run_command(self, command: str) -> str:
-        """运行命令 (在个人电脑上执行). 返回命令输出."""
+    def run_command(self, command: str, timeout: int = 60,
+                    max_chars: int = 2000) -> str:
+        """运行命令 (在个人电脑上执行). 返回命令输出.
+
+        参数:
+            command:  要执行的命令 (Shell 语句).
+            timeout:  超时秒数 (默认 60).
+            max_chars: 输出截断上限 (默认 2000).
+        """
+
+    def _format_result(self, r: Any, max_chars: int = 2000) -> str:
+        """统一格式化命令执行结果 (exit 码 + 输出截断).
+
+        三个实现 (Local/Podman/SSH) 共用: 非零退出码前缀 [exit N],
+        成功输出截断到 max_chars, 空输出显示 (无输出).
+        """
+        output = ((getattr(r, "stdout", None) or "")
+                  + (getattr(r, "stderr", None) or "")).strip()
+        rc = getattr(r, "returncode", 0)
+        if rc != 0:
+            return f"[exit {rc}] {output[:max_chars]}"
+        return output[:max_chars] or "(无输出)"
 
     @abstractmethod
     def read_file(self, path: str) -> str:
@@ -207,6 +227,11 @@ class Computer(ABC):
     @abstractmethod
     def delete_file(self, path: str) -> str:
         """删除个人电脑上的文件. 返回状态说明 (成功/错误)."""
+
+    @property
+    def auto_mcp(self) -> bool:
+        """是否自动装配 MCP 服务器 (只读)."""
+        return self._auto_mcp
 
     # ── MCP 工具安装与执行 (所有实现共用) ────────────────
 
@@ -401,10 +426,7 @@ class LocalComputer(Computer):
                 command, shell=True, cwd=self._dir, capture_output=True,
                 text=True, timeout=timeout,
             )
-            output = (result.stdout or "") + (result.stderr or "")
-            if result.returncode != 0:
-                return f"[exit {result.returncode}] {output.strip()[:2000]}"
-            return output.strip()[:max_chars] or "(无输出)"
+            return self._format_result(result, max_chars)
         except subprocess.TimeoutExpired:
             return f"错误: 命令超时 ({timeout}s)."
         except Exception as exc:
@@ -705,10 +727,7 @@ class PodmanComputer(Computer):
             r = self._pod("exec", "--user", self.username,
                           self.container_name, "sh", "-c", command,
                           timeout=timeout)
-            output = (r.stdout or "") + (r.stderr or "")
-            if r.returncode != 0:
-                return f"[exit {r.returncode}] {output.strip()[:2000]}"
-            return output.strip()[:max_chars] or "(无输出)"
+            return self._format_result(r, max_chars)
         except Exception as exc:
             return f"错误: 命令执行失败 - {exc}"
 
@@ -816,8 +835,9 @@ class SSHComputer(Computer):
     def workdir(self) -> str:
         return f"~/maf-{self.role_id or 'shared'}"
 
-    def _ssh(self, remote_cmd: str, timeout: int = 60) -> str:
-        """执行远程命令, 返回输出文本."""
+    def _ssh(self, remote_cmd: str, timeout: int = 60,
+             max_chars: int = 2000) -> str:
+        """执行远程命令, 返回输出文本 (格式化见基类 _format_result)."""
         target = self.host
         if self.user:
             target = f"{self.user}@{target}"
@@ -828,12 +848,9 @@ class SSHComputer(Computer):
         cmd += [target, f"mkdir -p {self.workdir} && cd {self.workdir} && {remote_cmd}"]
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-            output = (r.stdout or "") + (r.stderr or "")
-            if r.returncode != 0:
-                return f"[exit {r.returncode}] {output.strip()[:2000]}"
-            return output.strip()[:2000] or "(无输出)"
+            return self._format_result(r, max_chars)
         except subprocess.TimeoutExpired:
-            return "错误: ssh 命令超时 (60s)."
+            return f"错误: ssh 命令超时 ({timeout}s)."
         except Exception as exc:
             return f"错误: ssh 执行失败 - {exc}"
 
@@ -849,10 +866,11 @@ class SSHComputer(Computer):
         self._on = False
         return f"电脑[{self.role_id}] (ssh) 已断开."
 
-    def run_command(self, command: str) -> str:
+    def run_command(self, command: str, timeout: int = 60,
+                    max_chars: int = 2000) -> str:
         if not self._on:
             return "错误: 电脑未开机."
-        return self._ssh(command)
+        return self._ssh(command, timeout=timeout, max_chars=max_chars)
 
     def read_file(self, path: str) -> str:
         # shlex.quote: 防路径中的单引号/反引号/$() 闭合注入 (与 Podman 版一致)
@@ -1102,6 +1120,10 @@ class ComputerManager:
     def get(self, role_id: str) -> Any:
         """按角色 ID 获取电脑 (不存在抛 KeyError)."""
         return self._computers[role_id]
+
+    def name_of(self, role_id: str, default: str = "") -> str:
+        """只读查询角色的显示名 (注册时的人名; 未注册返回 default 或 role_id)."""
+        return self._names.get(role_id, default or role_id)
 
     def list_all(self) -> list[Any]:
         """返回全部已注册电脑列表 (按注册顺序)."""
