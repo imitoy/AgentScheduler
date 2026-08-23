@@ -100,7 +100,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +312,16 @@ class Computer(ABC):
     def list_installed_mcp_tools(self) -> list[str]:
         """列出本电脑已安装的 MCP 工具名 (排序)."""
         return sorted(self._mcp_tools)
+
+    def get_mcp_tool(self, name: str) -> Optional[ToolDef]:
+        """按名取已安装的 MCP 工具定义 (未安装返回 None)."""
+        from src.core.tools import ToolDef
+        return self._mcp_tools.get(name)
+
+    def iter_mcp_tools(self) -> Iterator[ToolDef]:
+        """遍历已安装的 MCP 工具定义 (ToolDef, 含 description/schema)."""
+        from src.core.tools import ToolDef
+        return iter(self._mcp_tools.values())
 
     def run_mcp_tool(self, tool_name: str, args: dict[str, Any]) -> str:
         """运行 MCP 工具 (在本电脑上执行).

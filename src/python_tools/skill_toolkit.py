@@ -234,16 +234,12 @@ class SkillManager:
             return f"技能 '{skill_name}' 已添加给 {role_id}, 无需重复添加."
 
         # 注册代理 handler → 返回 SKILL.md 全文 + 相关文件清单
-        from src.core.tools import ToolRegistry
-        if role._tools is None:
-            role._tools = ToolRegistry()
-
         def _make_handler(info_: SkillInfo):
             def handler(args: dict[str, Any]) -> str:
                 return _read_skill_content(info_)
             return handler
 
-        role._tools.add_tool(
+        role.add_single_tool(
             name=info.tool_name(),
             description=(info.description or f"技能: {info.name}")[:300],
             input_schema={"type": "object", "properties": {}},
@@ -270,11 +266,8 @@ class SkillManager:
             return f"技能 '{skill_name}' 尚未添加给 {role_id}, 无需移除."
 
         info = self._skills.get(skill_name)
-        from src.core.tools import ToolRegistry
-        if role._tools is None:
-            role._tools = ToolRegistry()
         if info is not None:
-            role._tools.remove_tool(info.tool_name())
+            role.remove_single_tool(info.tool_name())
         mine.discard(skill_name)
         logger.info("[%s] 技能工具已移除: %s", role_id, skill_name)
         return f"成功: 技能 '{skill_name}' 已从 {role_id} 移除."
@@ -326,10 +319,10 @@ def create_skill_manager_toolkit(manager: SkillManager) -> ToolKit:
         skill_my_skills 的工具类.
     """
     tk = ToolKit(name="skill_manager", description="技能管理: 搜索/添加/移除 SKILL.md 技能工具")
-    tk._skill_holder = {"manager": manager, "role": None}  # type: ignore[attr-defined]
+    tk.bind("manager", manager)
 
     def _role() -> Any:
-        r = tk._skill_holder["role"]  # type: ignore[attr-defined]
+        r = tk.require("role", "角色")
         if r is None:
             raise RuntimeError("skill_manager 工具类尚未绑定角色, 请通过 role.add_toolkit() 注册")
         return r
@@ -427,4 +420,4 @@ def bind_role_to_toolkit(toolkit: ToolKit, role: Any) -> None:
         toolkit: skill_manager 工具类实例.
         role:    绑定的 AgentRole.
     """
-    toolkit._skill_holder["role"] = role  # type: ignore[attr-defined]
+    toolkit.bind("role", role)

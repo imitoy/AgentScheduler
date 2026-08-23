@@ -60,7 +60,7 @@ def _bind_todo(role: AgentRole, path=None) -> object:
     """绑定 TodoStore (默认隔离路径, 避免读到真实运行残留)."""
     from src.core.todo_store import TodoStore
     tk = create_todo_toolkit()
-    tk._todo_holder["store"] = TodoStore(role_id=role.role_id, path=path)  # type: ignore[attr-defined]
+    tk.bind("store", TodoStore(role_id=role.role_id, path=path))
     return tk
 
 
@@ -100,7 +100,7 @@ def test_my_tasks_tool(tmp_path, monkeypatch):
     role = AgentRole(name="测试", role_id="tester_1")
     pool.add_role(role)
     tk = create_task_view_toolkit()
-    tk._role_holder["role"] = role  # type: ignore[attr-defined]
+    tk.bind("role", role)
 
     # 空状态
     out = tk._tools["my_tasks"].handler({})

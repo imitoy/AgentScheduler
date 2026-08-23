@@ -41,10 +41,9 @@ def create_task_view_toolkit() -> ToolKit:
                  description="任务列表工具类: 查看分配给我的任务 (队列+历史)")
 
     # 工具类持有 role 引用 (由 AgentRole.add_toolkit 注入)
-    tk._role_holder = {"role": None}  # type: ignore[attr-defined]
 
     def _get_role() -> Any:
-        role = getattr(tk, "_role_holder", {}).get("role")
+        role = tk.get("role")
         if role is None:
             raise RuntimeError("任务列表工具类尚未绑定角色, 请通过 role.add_toolkit() 注册")
         return role
@@ -114,4 +113,4 @@ def bind_role_to_toolkit(toolkit: ToolKit, role: Any) -> None:
         toolkit: task_view 工具类实例.
         role:    AgentRole 实例 (提供任务队列与历史).
     """
-    toolkit._role_holder["role"] = role  # type: ignore[attr-defined]
+    toolkit.bind("role", role)

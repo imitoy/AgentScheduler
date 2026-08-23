@@ -31,7 +31,7 @@ def _setup_roles(tmp_path, monkeypatch, *role_ids):
         pool.add_role(role)
         role._pool = pool  # 模拟 start() 后的 back-reference (talk_wait 解析目标用)
         tk = create_talk_toolkit(pool)
-        tk._role_holder = {"role": role}  # type: ignore[attr-defined]
+        tk.bind("role", role)
         toolkits[rid] = tk
     return pool, toolkits
 
@@ -131,7 +131,7 @@ def test_wait_roundtrip_with_real_names(tmp_path, monkeypatch):
     tks = {}
     for r in (a, b):
         tk = create_talk_toolkit(pool)
-        tk._role_holder = {"role": r}  # type: ignore[attr-defined]
+        tk.bind("role", r)
         tks[r.role_id] = tk
 
     result = {}
@@ -267,9 +267,9 @@ def test_talk_attachment_validated_and_carried(tmp_path, monkeypatch):
     a.computer.write_file(f"{a.computer.drive_root}/郭晓东/设计稿.md", "附件内容")
 
     tk_a = create_talk_toolkit(pool)
-    tk_a._role_holder = {"role": a}  # type: ignore[attr-defined]
+    tk_a.bind("role", a)
     tk_b = create_talk_toolkit(pool)
-    tk_b._role_holder = {"role": b}  # type: ignore[attr-defined]
+    tk_b.bind("role", b)
 
     # 无效附件 (不存在) → 拒绝
     r = tk_a._tools["talk"].handler(

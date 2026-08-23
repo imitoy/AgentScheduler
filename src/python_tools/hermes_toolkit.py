@@ -55,10 +55,9 @@ def create_hermes_toolkit() -> ToolKit:
     tk = ToolKit(name="hermes", description="Hermes 工具类: 调用电脑上的 Hermes Agent")
 
     # 工具类持有 role 引用 (由 AgentRole.add_toolkit 注入, 提供个人电脑)
-    tk._hermes_holder = {"role": None}  # type: ignore[attr-defined]
 
     def _get_role() -> Any:
-        return getattr(tk, "_hermes_holder", {}).get("role")
+        return tk.get("role")
 
     def _computer() -> Any:
         role = _get_role()
@@ -161,4 +160,4 @@ def bind_hermes_to_toolkit(toolkit: ToolKit, role: Any) -> None:
         toolkit: hermes 工具类实例.
         role:    绑定的 AgentRole (提供个人电脑, 命令在容器内以员工身份执行).
     """
-    toolkit._hermes_holder["role"] = role  # type: ignore[attr-defined]
+    toolkit.bind("role", role)

@@ -41,10 +41,9 @@ def create_computer_toolkit() -> ToolKit:
     """
     tk = ToolKit(name="computer", description="个人电脑工具: 运行命令, 运行 MCP 工具")
     # 持有当前角色引用 (由 AgentRole.add_toolkit 绑定)
-    tk._computer_holder = {"role": None}  # type: ignore[attr-defined]
 
     def _computer() -> Any:
-        r = tk._computer_holder["role"]  # type: ignore[attr-defined]
+        r = tk.require("role", "角色")
         if r is None:
             raise RuntimeError("computer 工具类尚未绑定角色, 请通过 role.add_toolkit() 注册")
         return r.computer  # 角色添加时自动创建 (默认 Podman)
@@ -115,4 +114,4 @@ def bind_computer_to_toolkit(toolkit: ToolKit, role: Any) -> None:
         toolkit: computer 工具类实例.
         role:    绑定的 AgentRole (其 computer 属性提供个人电脑).
     """
-    toolkit._computer_holder["role"] = role  # type: ignore[attr-defined]
+    toolkit.bind("role", role)

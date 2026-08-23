@@ -582,7 +582,7 @@ class AgentRole:
         from src.python_tools.talk_toolkit import create_talk_toolkit
 
         tk = create_talk_toolkit(self._pool)
-        tk._role_holder = {"role": self}  # type: ignore[attr-defined]  # 供 talk 记录发送方活动日志
+        tk.bind("role", self)  # 供 talk 记录发送方活动日志
         added = self.add_toolkit(tk)
         logger.info("[%s] talk toolkit loaded — %d tools", self.role_id, added)
 
@@ -694,6 +694,36 @@ class AgentRole:
     def bind_computer(self, comp: Any) -> None:
         """绑定个人电脑对象 (StateStore 恢复容器绑定时用)."""
         self._computer = comp
+
+    def ensure_tools(self) -> Any:
+        """确保工具注册表已初始化 (惰性创建, 动态加/删单工具时用)."""
+        if self._tools is None:
+            from src.core.tools import ToolRegistry
+            self._tools = ToolRegistry()
+        return self._tools
+
+    def add_single_tool(self, name: str, description: str,
+                        input_schema: dict[str, Any], handler: Any,
+                        source: str = "inline", **kwargs: Any) -> None:
+        """动态注册单个工具到角色 (注册表不存在则先创建).
+
+        参数:
+            name:        工具名.
+            description: 工具描述 (LLM 可见).
+            input_schema: OpenAI 参数 schema.
+            handler:     调用函数.
+            source:      来源标记 (python / mcp:<pkg> / inline).
+        """
+        self.ensure_tools().add_tool(
+            name, description, input_schema, handler, source=source, **kwargs)
+
+    def remove_single_tool(self, name: str) -> bool:
+        """动态移除角色上的单个工具. 返回是否存在."""
+        if self._tools is None:
+            return False
+        existed = name in self._tools._tools
+        self._tools.remove_tool(name)
+        return existed
 
     def talk_wait(self, target_id: str, task: Optional[Task] = None,
                   timeout: Optional[float] = None) -> Optional[str]:

@@ -40,17 +40,15 @@ def create_memory_toolkit() -> ToolKit:
     tk = ToolKit(name="memory", description="记忆与笔记工具类: 每日总结, 笔记管理")
 
     # 工具类持有 store / role 引用 (由 AgentRole.add_toolkit 注入)
-    tk._store_holder = {"store": None}  # type: ignore[attr-defined]
-    tk._role_holder = {"role": None}    # type: ignore[attr-defined]
 
     def _get_store() -> Any:
-        store = tk._store_holder["store"]  # type: ignore[attr-defined]
+        store = tk.require("store", "笔记存储")
         if store is None:
             raise RuntimeError("记忆工具类尚未绑定 NoteStore, 请通过 role.add_toolkit() 注册")
         return store
 
     def _get_role() -> Any:
-        return tk._role_holder["role"]  # type: ignore[attr-defined]
+        return tk.require("role", "角色")
 
     def _summary(args: dict[str, Any]) -> str:
         """总结这一天. 保存后下一天自动注入提示词, 并将角色切换为 OFF_DUTY.
@@ -298,5 +296,5 @@ def bind_store_to_toolkit(toolkit: ToolKit, store: Any, role: Any = None) -> Non
         store:   NoteStore 实例
         role:    绑定的 AgentRole (可选, 用于 summary 后切换 OFF_DUTY)
     """
-    toolkit._store_holder["store"] = store  # type: ignore[attr-defined]
-    toolkit._role_holder["role"] = role     # type: ignore[attr-defined]
+    toolkit.bind("store", store)
+    toolkit.bind("role", role)

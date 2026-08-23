@@ -104,6 +104,30 @@ class ToolKit:
         self.name = name
         self.description = description
         self._tools: dict[str, ToolDef] = {}
+        # 工具类上下文绑定 (role / manager / store 等), 替代各工具类
+        # 手写 "_xxx_holder" dict + type: ignore — 统一由基类管理
+        self._bindings: dict[str, Any] = {}
+
+    # ── 上下文绑定 (bind/require) ─────────────────────────
+
+    def bind(self, key: str, value: Any) -> None:
+        """绑定工具类上下文 (如 role / manager / store).
+
+        替代各工具类手写 holder dict: `tk._xxx_holder = {...}`.
+        由 bind_*_to_toolkit 在角色装配时调用.
+        """
+        self._bindings[key] = value
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """读取绑定上下文, 未绑定时返回 default (不抛错)."""
+        return self._bindings.get(key, default)
+
+    def require(self, key: str, what: str = "上下文") -> Any:
+        """读取绑定上下文, 未绑定时抛清晰错误 (工具被执行前应有的绑定)."""
+        if key not in self._bindings or self._bindings[key] is None:
+            raise RuntimeError(
+                f"{what}尚未绑定, 请通过 role.add_toolkit() 注册该工具类")
+        return self._bindings[key]
 
     # ── Python tool management ────────────────────────────
 
@@ -127,6 +151,25 @@ class ToolKit:
         self._tools[name] = td
         logger.info("ToolKit[%s] Python tool: %s", self.name, name)
         return td
+
+    def add_tool(self, td: "ToolDef") -> None:
+        """直接添加已构建的 ToolDef (source 由 td 自带, 供 MCP 工具等使用).
+
+        与 add_python_tool 的区别: 后者固定 source=\"python\" 并从参数
+        构造 ToolDef; 这里接受现成定义 (如 MCP 工具, source=\"mcp:...\").
+        """
+        if td.name in self._tools:
+            raise ValueError(
+                f"Tool '{td.name}' already exists in toolkit '{self.name}'")
+        self._tools[td.name] = td
+        logger.info("ToolKit[%s] tool added: %s (source=%s)",
+                    self.name, td.name, td.source)
+
+    def remove_tool(self, name: str) -> bool:
+        """删除工具. 返回是否存在."""
+        existed = name in self._tools
+        self._tools.pop(name, None)
+        return existed
 
     # ── Properties ────────────────────────────────────────
 

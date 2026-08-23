@@ -39,10 +39,9 @@ def create_todo_toolkit() -> ToolKit:
     tk = ToolKit(name="todo", description="Todo 清单工具类: 管理自己的待办事项")
 
     # 工具类持有 store 引用 (由 AgentRole.add_toolkit 注入)
-    tk._todo_holder = {"store": None}  # type: ignore[attr-defined]
 
     def _get_store() -> Any:
-        store = getattr(tk, "_todo_holder", {}).get("store")
+        store = tk.get("store")
         if store is None:
             raise RuntimeError("Todo 工具类尚未绑定存储, 请通过 role.add_toolkit() 注册")
         return store
@@ -190,4 +189,4 @@ def bind_todo_to_toolkit(toolkit: ToolKit, store: Any) -> None:
         toolkit: todo 工具类实例.
         store:   TodoStore 实例.
     """
-    toolkit._todo_holder["store"] = store  # type: ignore[attr-defined]
+    toolkit.bind("store", store)

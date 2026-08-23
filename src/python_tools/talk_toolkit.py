@@ -138,8 +138,7 @@ def create_talk_toolkit(pool: Any) -> ToolKit:
             return (f"错误: 团队中找不到 '{target}'。"
                     f"请先调用 list_roles 查看当前成员姓名, 再用人名发送。")
         urgency = getattr(Urgency, urgency_str.upper(), Urgency.NORMAL)
-        sender = getattr(tk, "_role_holder", None)
-        sender = sender.get("role") if sender is not None else None
+        sender = tk.get("role")
         sender_id = sender.role_id if sender is not None else None
 
         # ── 附件校验: 云盘路径必须存在且当前角色可读 (容器内以本人身份判定) ──

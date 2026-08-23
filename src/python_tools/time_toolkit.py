@@ -37,7 +37,6 @@ def create_time_toolkit() -> ToolKit:
     tk = ToolKit(name="time", description="时间与作息工具类")
 
     # 工具类持有 time_manager / role 引用 (由 AgentRole.add_toolkit 注入)
-    tk._time_holder = {"manager": None, "role": None}  # type: ignore[attr-defined]
 
     def _get_time(args: dict[str, Any]) -> str:
         """查看当前作息时间.
@@ -48,7 +47,7 @@ def create_time_toolkit() -> ToolKit:
         返回:
             当前 Tick 数与作息状态描述.
         """
-        manager = tk._time_holder["manager"]  # type: ignore[attr-defined]
+        manager = tk.require("manager", "时间管理器")
         if manager is None:
             raise RuntimeError("时间工具类尚未绑定 TimeEventBus, 请通过 role.add_toolkit() 注册")
 
@@ -67,8 +66,8 @@ def create_time_toolkit() -> ToolKit:
         返回:
             休息状态说明.
         """
-        manager = tk._time_holder["manager"]  # type: ignore[attr-defined]
-        role = tk._time_holder["role"]  # type: ignore[attr-defined]
+        manager = tk.require("manager", "时间管理器")
+        role = tk.require("role", "角色")
         if manager is None:
             raise RuntimeError("时间工具类尚未绑定 TimeEventBus, 请通过 role.add_toolkit() 注册")
 
@@ -116,5 +115,5 @@ def bind_time_to_toolkit(toolkit: ToolKit, manager: Any, role: Any = None) -> No
         manager:  TimeEventBus 实例
         role:     绑定的 AgentRole (可选, 用于休息时设置状态)
     """
-    toolkit._time_holder["manager"] = manager  # type: ignore[attr-defined]
-    toolkit._time_holder["role"] = role        # type: ignore[attr-defined]
+    toolkit.bind("manager", manager)
+    toolkit.bind("role", role)

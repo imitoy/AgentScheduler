@@ -31,7 +31,7 @@ def _mk_toolkit(computer: _FakeComputer):
     role = AgentRole(name="郭晓东", role_id="tester_1")
     pool.add_role(role)
     tk = create_hermes_toolkit()
-    tk._hermes_holder["role"] = role  # type: ignore[attr-defined]
+    tk.bind("role", role)
     role._computer = computer  # type: ignore[attr-defined]  # 注入 fake 电脑
     return pool, role, tk
 

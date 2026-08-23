@@ -38,10 +38,9 @@ def create_hr_toolkit(api_key: str | None = None) -> ToolKit:
     """
     tk = ToolKit(name="hr", description="人力资源工具类: 招聘, 入职")
     # 持有当前角色引用 (由 AgentRole.add_toolkit 绑定, 用于访问 RolePool)
-    tk._hr_holder = {"role": None}  # type: ignore[attr-defined]
 
     def _role() -> Any:
-        r = tk._hr_holder["role"]  # type: ignore[attr-defined]
+        r = tk.require("role", "角色")
         if r is None:
             raise RuntimeError("hr 工具类尚未绑定角色, 请通过 role.add_toolkit() 注册")
         return r
@@ -171,4 +170,4 @@ def bind_role_to_toolkit(toolkit: ToolKit, role: Any) -> None:
         toolkit: hr 工具类实例.
         role:    绑定的 AgentRole (用于通过 _pool 找到 RolePool 完成入职).
     """
-    toolkit._hr_holder["role"] = role  # type: ignore[attr-defined]
+    toolkit.bind("role", role)

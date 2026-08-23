@@ -123,17 +123,14 @@ class MCPManager:
             return f"工具 '{tool_name}' 已添加给 {role_id}, 无需重复添加."
 
         # 2) 从电脑服务器取工具
-        td = computer._mcp_tools.get(tool_name)
+        td = computer.get_mcp_tool(tool_name)
         if td is None:
             return (f"错误: 电脑[{role_id}] 的 MCP 服务器上没有名为 '{tool_name}' 的工具. "
                     f"本电脑已安装: {computer.list_installed_mcp_tools() or '(无)'}. "
                     f"可用 mcp_search / mcp_list 查看全局可用工具.")
 
         # 3) 角色注册代理 handler → 转发到电脑服务器上执行
-        from src.core.tools import ToolRegistry
-        if role._tools is None:
-            role._tools = ToolRegistry()
-        role._tools.add_tool(
+        role.add_single_tool(
             name=td.name,
             description=td.description,
             input_schema=td.input_schema,
@@ -207,10 +204,10 @@ def create_mcp_manager_toolkit(manager: MCPManager) -> ToolKit:
     """
     tk = ToolKit(name="mcp_manager", description="MCP 工具管理: 搜索/添加/移除本地 MCP 工具")
     # 持有 manager 与当前角色引用 (由 AgentRole.add_toolkit 绑定)
-    tk._mcp_holder = {"manager": manager, "role": None}  # type: ignore[attr-defined]
+    tk.bind("manager", manager)
 
     def _role() -> Any:
-        r = tk._mcp_holder["role"]  # type: ignore[attr-defined]
+        r = tk.require("role", "角色")
         if r is None:
             raise RuntimeError("mcp_manager 工具类尚未绑定角色, 请通过 role.add_toolkit() 注册")
         return r
@@ -240,7 +237,8 @@ def create_mcp_manager_toolkit(manager: MCPManager) -> ToolKit:
         computer = _role().computer
         avail = [
             {"name": n, "description": (td.description or "")}
-            for n, td in sorted(computer._mcp_tools.items())
+            for n, td in sorted(
+                ((t.name, t) for t in computer.iter_mcp_tools()))
         ]
         if not avail:
             return "本电脑暂无 MCP 服务器工具 (服务器可能未连接)."
@@ -319,4 +317,4 @@ def bind_mcp_manager_to_toolkit(toolkit: ToolKit, role: Any) -> None:
         toolkit: mcp_manager 工具类实例.
         role:    绑定的 AgentRole.
     """
-    toolkit._mcp_holder["role"] = role  # type: ignore[attr-defined]
+    toolkit.bind("role", role)

@@ -331,7 +331,7 @@ class MCPToolLoader:
                     source=f"mcp:{server.package}",
                     mcp_tool=tool,
                 )
-                toolkits[gname]._tools[tname] = td
+                toolkits[gname].add_tool(td)
 
         return toolkits
 
