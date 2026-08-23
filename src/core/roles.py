@@ -12,7 +12,7 @@ incoming events/tasks to appropriate roles.
 接口文档 (模块结构与方法):
 
 类与方法:
-    ToolLoopError: (枚举/常量类)
+    ToolLoopError: 工具调用循环超限或 LLM 调用失败的异常类.
     Urgency: (枚举/常量类)
     Task: (枚举/常量类)
     AgentRole:
@@ -899,9 +899,14 @@ class RolePool:
     """
 
     def __init__(self, llm_api_key: Optional[str] = None, llm_model: Optional[str] = None,
-                 llm_provider: Optional[str] = None, time_manager: Any = None):
+                 llm_provider: Optional[str] = None, time_manager: Any = None,
+                 auto_toolkits: bool = True):
         self._roles: dict[str, AgentRole] = {}
         self._uid_counter: int = 0  # 容器内 uid 分配计数器 (1100 + 注册序号)
+        # 默认工具装配开关 (AgentSystem(auto_toolkits=False) 时关闭 —
+        # 此前 start() 无条件 _setup_role, 标志被静默无视, 角色仍拿到
+        # 默认工具类; 现在 start/add_role_and_start 都尊重此标志)
+        self.auto_toolkits = auto_toolkits
         # 每角色一个常驻 worker 线程 (角色空闲时 sleep 轮询, 线程不退出).
         # max_workers 必须 ≥ 最大角色数: 默认值 min(32, cpu+4) 只有 28,
         # 40 个角色时后注册的 12 个 worker 永远排不到线程 → 日志停在
@@ -989,8 +994,10 @@ class RolePool:
             raise ValueError(f"Role '{role.role_id}' already exists")
         self._roles[role.role_id] = role
 
-        # 角色装配 (唯一入口, 与 AgentSystem.add_role 相同路径)
-        self._setup_role(role)
+        # 角色装配 (唯一入口, 与 AgentSystem.add_role 相同路径;
+        # 尊重 auto_toolkits 开关)
+        if self.auto_toolkits:
+            self._setup_role(role)
 
         # 与 start() 相同的单角色启动逻辑
         self._start_one_role(role)
@@ -1090,8 +1097,10 @@ class RolePool:
     def start(self) -> None:
         """Launch all role worker threads."""
         for role_id, role in self._roles.items():
-            # 角色装配 (唯一入口; 幂等 — AgentSystem.add_role 已装配的会跳过)
-            self._setup_role(role)
+            # 角色装配 (唯一入口; 幂等 — AgentSystem.add_role 已装配的会跳过;
+            # auto_toolkits=False 时跳过默认工具/MCP 组装配)
+            if self.auto_toolkits:
+                self._setup_role(role)
             self._start_one_role(role)
 
     def shutdown(self, wait: bool = True) -> None:

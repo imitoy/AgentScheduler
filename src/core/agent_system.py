@@ -69,8 +69,10 @@ class AgentSystem:
         # 共享时间源: 所有角色绑定同一个 TimeEventBus
         self.time_manager = TimeEventBus(check_interval=check_interval)
 
-        # 角色池 (注入共享时间源: 招聘入职的新角色也会绑定同一个时钟)
-        self.pool = RolePool(time_manager=self.time_manager)
+        # 角色池 (注入共享时间源: 招聘入职的新角色也会绑定同一个时钟;
+        # auto_toolkits=False 时 RolePool.start 也不装配默认工具)
+        self.pool = RolePool(time_manager=self.time_manager,
+                             auto_toolkits=auto_toolkits)
         self.dispatcher = EventDispatcher(self.pool)
         self.auto_toolkits = auto_toolkits
 

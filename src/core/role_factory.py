@@ -134,7 +134,13 @@ class RoleFactory:
 
         # Ensure role_id is unique
         if generated_role_id in TEMPLATES:
-            generated_role_id = f"{generated_role_id}_{_next_name()[-3:]}"
+            # 冲突时用数字后缀 (原取人名 [-3:] 是中文, 会进 podman
+            # 容器名 maf-<role_id> 导致入职失败)
+            base = generated_role_id
+            dup = 1
+            while generated_role_id in TEMPLATES:
+                generated_role_id = f"{base}_{dup}"
+                dup += 1
 
         role = AgentRole(
             name=person_name,

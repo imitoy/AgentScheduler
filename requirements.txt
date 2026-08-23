@@ -1,3 +1,6 @@
 # MAF Scheduler 运行时依赖
 requests>=2.31
 mcp>=1.0
+
+# 测试依赖
+pytest>=8.0
