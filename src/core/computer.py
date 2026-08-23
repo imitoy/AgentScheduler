@@ -272,7 +272,7 @@ class Computer(ABC):
             return []
 
         try:
-            from src.python_tools.mcp_toolkit import MCPServer
+            from src.core.mcp_client import MCPServer
             self._mcp_server = MCPServer(
                 package="@modelcontextprotocol/server-filesystem",
                 args=[self.host_dir],
@@ -544,7 +544,7 @@ class PodmanComputer(Computer):
             return []
 
         try:
-            from src.python_tools.mcp_toolkit import MCPServer
+            from src.core.mcp_client import MCPServer
             # 容器内启动 filesystem 服务器: podman exec -i <容器> <node 直启> /home/agent
             # -i 保持 stdin/stdout 管道, MCP stdio 协议走容器内进程
             self._ensure_container()  # 确保容器运行 + 包已预装
