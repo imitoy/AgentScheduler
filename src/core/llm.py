@@ -59,6 +59,11 @@ API_TIMEOUT = 120        # 单次请求超时秒数
 
 # ── 共享基类: OpenAI 兼容客户端 ─────────────────────────────
 
+# LLM 调用失败时的错误文本标记 (本文件产生这些前缀, 消费方 roles.py
+# 据此把任务标记为失败 — 生产方定义契约, 防止 roles.py 定义过期)
+LLM_ERROR_MARKERS = ("[API error:",)
+
+
 class OpenAICompatLLM:
     """OpenAI 兼容 chat/completions 客户端基类 (DeepSeek/Ollama 共用).
 

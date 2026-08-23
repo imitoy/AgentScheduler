@@ -20,7 +20,7 @@ DEFAULT_TOOLKITS (角色自动装配的工具类):
       create_mcp_manager_toolkit / create_skill_manager_toolkit /
       create_talk_toolkit / create_client_toolkit / create_hr_toolkit"""
 
-from typing import Callable
+from typing import Any, Callable, Optional
 
 from src.python_tools.memory_toolkit import create_memory_toolkit
 from src.python_tools.time_toolkit import create_time_toolkit
@@ -57,3 +57,42 @@ DEFAULT_TOOLKITS: dict[str, Callable[[], object]] = {
 # 默认 MCP 工具组: 角色加入/启动时自动把该组的 MCP 工具安装到个人电脑
 # (工具本身来自 mcp_group_rules.json 配置的 MCP 服务器, 不是自研 Python 工具).
 DEFAULT_MCP_GROUPS: tuple[str, ...] = ("file_ops",)  # 文件操作 MCP 工具集
+
+
+# ── 工具类绑定分发表 ───────────────────────────────────────
+# toolkit.name → 绑定函数 (toolkit, role). 与 DEFAULT_TOOLKITS 同属
+# "工具类装配注册表" (工厂表 + 绑定表), 统一放本文件 — 新增工具类只需
+# 改这里一处, 不用动 roles.py.
+_BINDER_CACHE: Optional[dict[str, Callable[[Any, Any], None]]] = None
+
+
+def get_toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
+    """返回工具类绑定分发表 (惰性初始化, 首次调用时导入各 bind 函数).
+
+    绑定函数只把角色引用放进 toolkit 的 bindings (ToolKit.bind),
+    工具 handler 在调用时才读取, 跨线程安全.
+    """
+    global _BINDER_CACHE
+    if _BINDER_CACHE is None:
+        from src.python_tools.computer_toolkit import bind_computer_to_toolkit
+        from src.python_tools.hermes_toolkit import bind_hermes_to_toolkit
+        from src.python_tools.hr_toolkit import bind_role_to_toolkit as bind_hr
+        from src.python_tools.mcp_manager import bind_mcp_manager_to_toolkit
+        from src.python_tools.memory_toolkit import bind_store_to_toolkit
+        from src.python_tools.skill_toolkit import bind_role_to_toolkit as bind_skill
+        from src.python_tools.task_view_toolkit import bind_role_to_toolkit as bind_task_view
+        from src.python_tools.time_toolkit import bind_time_to_toolkit
+        from src.python_tools.todo_toolkit import bind_todo_to_toolkit
+
+        _BINDER_CACHE = {
+            "memory":        lambda tk, role: bind_store_to_toolkit(tk, role.note_store, role=role),
+            "time":          lambda tk, role: bind_time_to_toolkit(tk, role.time_manager, role=role),
+            "mcp_manager":   lambda tk, role: bind_mcp_manager_to_toolkit(tk, role),
+            "skill_manager": lambda tk, role: bind_skill(tk, role),
+            "hr":            lambda tk, role: bind_hr(tk, role),
+            "computer":      lambda tk, role: bind_computer_to_toolkit(tk, role),
+            "todo":          lambda tk, role: bind_todo_to_toolkit(tk, role.todo_store),
+            "task_view":     lambda tk, role: bind_task_view(tk, role),
+            "hermes":        lambda tk, role: bind_hermes_to_toolkit(tk, role),
+        }
+    return _BINDER_CACHE

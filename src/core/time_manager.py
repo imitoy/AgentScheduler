@@ -769,3 +769,21 @@ class TimeEventBus(EventBus):
                     event_type, day, tick, event.payload["time"], event.priority.name)
 
         self._dispatch(event)
+
+
+# ── 进程级默认共享时钟 ─────────────────────────────────────
+
+_DEFAULT_BUS: Optional["TimeEventBus"] = None
+
+
+def get_default_bus() -> "TimeEventBus":
+    """进程级默认 TimeEventBus (惰性创建).
+
+    绕过 AgentSystem/RolePool 直接构造的角色 (独立测试 / RoleFactory
+    单用) 也拿到同一个时钟 — 归属本模块, 避免 roles.py 持有类属性
+    造成的跨测试全局状态残留.
+    """
+    global _DEFAULT_BUS
+    if _DEFAULT_BUS is None:
+        _DEFAULT_BUS = TimeEventBus()
+    return _DEFAULT_BUS

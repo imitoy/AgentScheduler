@@ -80,8 +80,9 @@ MAX_TOOL_ROUNDS = 20              # 最多工具调用轮数
 # 暂时放开 (None = 不限制): 已有上下文优化方案, 限制后续再加回.
 MAX_TOOL_TOTAL_TOKENS: Optional[int] = None
 
-# LLM 调用失败时的错误文本标记 (llm.py 超时/异常时返回这些前缀)
-LLM_ERROR_MARKERS = ("[API timeout]", "[API error:")
+# LLM 调用失败时的错误文本标记: 由生产方 llm.py 定义并产生,
+# 这里只消费 (llm.py 的 _call_api 超时/异常时返回这些前缀)
+from src.core.llm import LLM_ERROR_MARKERS
 
 # ── 角色活动日志 ──────────────────────────────────────────
 # 每个角色一个日志文件 (data/journals/<role_id>.md), 记录该角色的上下文更新
@@ -93,44 +94,6 @@ _JOURNAL_LOCK = threading.Lock()   # 多角色线程并发写日志的全局锁
 
 class ToolLoopError(RuntimeError):
     """工具调用循环超限或 LLM 调用失败. 任务应标记 failed, 错误文本不作为成功结果."""
-
-
-# ── 工具类绑定分发表 ───────────────────────────────────────
-# toolkit.name → 绑定函数 (toolkit, role). 消除 AgentRole.add_toolkit 里的
-# if/elif 链: 新增工具类只需在此注册一行 (延迟导入避免 import 循环).
-_TOOLKIT_BINDERS: Optional[dict[str, Callable[[Any, Any], None]]] = None
-
-
-def _toolkit_binders() -> dict[str, Callable[[Any, Any], None]]:
-    """返回工具类绑定分发表 (惰性初始化, 首次调用时导入各 bind 函数).
-
-    holder 模式: 绑定函数只把角色引用放进 toolkit 的 holder,
-    工具 handler 在调用时才读取, 跨线程安全.
-    """
-    global _TOOLKIT_BINDERS
-    if _TOOLKIT_BINDERS is None:
-        from src.python_tools.computer_toolkit import bind_computer_to_toolkit
-        from src.python_tools.hermes_toolkit import bind_hermes_to_toolkit
-        from src.python_tools.hr_toolkit import bind_role_to_toolkit as bind_hr
-        from src.python_tools.mcp_manager import bind_mcp_manager_to_toolkit
-        from src.python_tools.memory_toolkit import bind_store_to_toolkit
-        from src.python_tools.skill_toolkit import bind_role_to_toolkit as bind_skill
-        from src.python_tools.task_view_toolkit import bind_role_to_toolkit as bind_task_view
-        from src.python_tools.time_toolkit import bind_time_to_toolkit
-        from src.python_tools.todo_toolkit import bind_todo_to_toolkit
-
-        _TOOLKIT_BINDERS = {
-            "memory":        lambda tk, role: bind_store_to_toolkit(tk, role.note_store, role=role),
-            "time":          lambda tk, role: bind_time_to_toolkit(tk, role.time_manager, role=role),
-            "mcp_manager":   lambda tk, role: bind_mcp_manager_to_toolkit(tk, role),
-            "skill_manager": lambda tk, role: bind_skill(tk, role),
-            "hr":            lambda tk, role: bind_hr(tk, role),
-            "computer":      lambda tk, role: bind_computer_to_toolkit(tk, role),
-            "todo":          lambda tk, role: bind_todo_to_toolkit(tk, role.todo_store),
-            "task_view":     lambda tk, role: bind_task_view(tk, role),
-            "hermes":        lambda tk, role: bind_hermes_to_toolkit(tk, role),
-        }
-    return _TOOLKIT_BINDERS
 
 
 # ── Urgency ────────────────────────────────────────────────
@@ -514,18 +477,16 @@ class AgentRole:
     # ── Time manager (作息时间) ───────────────────────────
 
     # 进程级默认共享时钟: 绕过 AgentSystem/RolePool 直接构造的角色
+    # 进程级默认共享时钟的归属: time_manager.get_default_bus()
     # (独立测试、RoleFactory 单用) 也拿到同一个时钟, 不再每角色新建
     # 一个游离的未启动实例 (曾导致 get_time 永远第 1 天 Tick 0).
     # AgentSystem.add_role / RolePool._setup_role 会用系统共享实例覆盖.
-    _DEFAULT_TIME_MANAGER: Any = None
 
     @staticmethod
     def _get_default_time_manager() -> Any:
-        """惰性创建进程级默认 TimeEventBus (避免 import 循环)."""
-        if AgentRole._DEFAULT_TIME_MANAGER is None:
-            from src.core.time_manager import TimeEventBus
-            AgentRole._DEFAULT_TIME_MANAGER = TimeEventBus()
-        return AgentRole._DEFAULT_TIME_MANAGER
+        """惰性创建进程级默认 TimeEventBus (归属 time_manager 模块)."""
+        from src.core.time_manager import get_default_bus
+        return get_default_bus()
 
     @property
     def time_manager(self) -> Any:
@@ -556,8 +517,10 @@ class AgentRole:
             self._tools = ToolRegistry()
 
         # 按工具类名分发绑定逻辑 (holder 模式: 调用时才读角色引用, 跨线程安全).
-        # 新增工具类只需在 _toolkit_binders() 注册一行, 不用改本方法.
-        for name, binder in _toolkit_binders().items():
+        # 新增工具类只需在 python_tools 的 get_toolkit_binders() 注册一行,
+        # 不用改本方法.
+        from src.python_tools import get_toolkit_binders
+        for name, binder in get_toolkit_binders().items():
             if toolkit.name == name:
                 binder(toolkit, self)
                 break
