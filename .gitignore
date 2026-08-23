@@ -16,3 +16,12 @@ build/
 .venv/
 venv/
 .vscode/
+# Hermes 内部规划目录 (plan skill 产物, 不是项目文件)
+.hermes/
+# 敏感凭据 (SSH 私钥/API key 等) — 曾误入提交历史, 禁止再跟踪
+*_key
+*_key.pub
+*.pem
+*.key
+# 根目录杂项脚本 (库版本检查等, 非项目代码)
+library_checker.py
